@@ -1,0 +1,215 @@
+<script src="../../dist/vue-vapor.global.js"></script>
+<link rel="stylesheet" href="../../../../node_modules/todomvc-app-css/index.css">
+
+<div id="app"></div>
+
+<script>
+const { render, defineComponent, reactive, computed, watchEffect, onMounted, onUnmounted } = VueVapor
+
+const STORAGE_KEY = 'todos-vuejs-3.x'
+const todoStorage = {
+  fetch () {
+    const todos = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
+    todos.forEach((todo, index) => {
+      todo.id = index
+    })
+    todoStorage.uid = todos.length
+    return todos
+  },
+  save (todos) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(todos))
+  }
+}
+
+const filters = {
+  all (todos) {
+    return todos
+  },
+  active (todos) {
+    return todos.filter((todo) => {
+      return !todo.completed
+    })
+  },
+  completed (todos) {
+    return todos.filter(function (todo) {
+      return todo.completed
+    })
+  }
+}
+
+function pluralize (n) {
+  return n === 1 ? 'item' : 'items'
+}
+
+const _sfc_main = defineComponent({
+  setup() {
+    const state = reactive({
+      todos: todoStorage.fetch(),
+      editedTodo: null,
+      newTodo: '',
+      beforeEditCache: '',
+      visibility: 'all',
+      remaining: computed(() => {
+        return filters.active(state.todos).length
+      }),
+      remainingText: computed(() => {
+        return ` ${pluralize(state.remaining)} left`
+      }),
+      filteredTodos: computed(() => {
+        return filters[state.visibility](state.todos)
+      }),
+      allDone: computed({
+        get: function () {
+          return state.remaining === 0
+        },
+        set: function (value) {
+          state.todos.forEach((todo) => {
+            todo.completed = value
+          })
+        }
+      })
+    })
+
+    watchEffect(() => {
+      todoStorage.save(state.todos)
+    })
+
+    onMounted(() => {
+      window.addEventListener('hashchange', onHashChange)
+      onHashChange()
+    })
+
+    onUnmounted(() => {
+      window.removeEventListener('hashchange', onHashChange)
+    })
+
+    function onHashChange() {
+      const visibility = window.location.hash.replace(/#\/?/, '')
+      if (filters[visibility]) {
+        state.visibility = visibility
+      } else {
+        window.location.hash = ''
+        state.visibility = 'all'
+      }
+    }
+
+    function addTodo() {
+      const value = state.newTodo && state.newTodo.trim()
+      if (!value) {
+        return
+      }
+      state.todos.push({
+        id: todoStorage.uid++,
+        title: value,
+        completed: false
+      })
+      state.newTodo = ''
+    }
+
+    function removeTodo(todo) {
+      state.todos.splice(state.todos.indexOf(todo), 1)
+    }
+
+    function editTodo(todo) {
+      state.beforeEditCache = todo.title
+      state.editedTodo = todo
+    }
+
+    function doneEdit(todo) {
+      if (!state.editedTodo) {
+        return
+      }
+      state.editedTodo = null
+      todo.title = todo.title.trim()
+      if (!todo.title) {
+        removeTodo(todo)
+      }
+    }
+
+    function cancelEdit(todo) {
+      state.editedTodo = null
+      todo.title = state.beforeEditCache
+    }
+
+    function removeCompleted() {
+      state.todos = filters.active(state.todos)
+    }
+
+    return {
+      state,
+      addTodo,
+      removeTodo,
+      editTodo,
+      doneEdit,
+      cancelEdit,
+      removeCompleted
+    }
+  },
+
+  directives: {
+    'todo-focus': (el, { value }) => {
+      if (value) {
+        el.focus()
+      }
+    }
+  }
+})
+
+const { template: _template, children: _children, vModelText: _vModelText, withDirectives: _withDirectives, vModelCheckbox: _vModelCheckbox, vShow: _vShow, on: _on, withKeys: _withKeys, resolveDirective: _resolveDirective, setText: _setText, setClass: _setClass, renderEffect: _renderEffect, createFor: _createFor, append: _append } = VueVapor
+
+function _sfc_render(_ctx) {
+  const t0 = _template("<li class=\"todo\"><div class=\"view\"><input class=\"toggle\" type=\"checkbox\"><label></label><button class=\"destroy\"></button></div><input class=\"edit\" type=\"text\"></li>")
+  const t1 = _template("<section class=\"todoapp\"><header class=\"header\"><h1>todos</h1><input class=\"new-todo\" autofocus autocomplete=\"off\" placeholder=\"What needs to be done?\"></header><section class=\"main\"><input id=\"toggle-all\" class=\"toggle-all\" type=\"checkbox\"><label for=\"toggle-all\">Mark all: complete</label><ul class=\"todo-list\"></ul></section><footer class=\"footer\"><span class=\"todo-count\"><strong></strong><span></span></span><ul class=\"filters\"><li><a href=\"#/all\">All</a></li><li><a href=\"#/active\">Active</a></li><li><a href=\"#/completed\">Completed</a></li></ul><button class=\"clear-completed\"> Clear completed </button></footer></section>")
+  const n0 = t1()
+  const { 0: [, { 0: [, { 1: [n1],}], 1: [n11, { 0: [n2], 2: [n10],}], 2: [n18, { 0: [, { 0: [n12], 1: [n13],}], 1: [, { 0: [, { 0: [n14],}], 1: [, { 0: [n15],}], 2: [, { 0: [n16],}],}], 2: [n17],}],}],} = _children(n0)
+  _withDirectives(n1, [[_vModelText, () => _ctx.state.newTodo]])
+  _withDirectives(n2, [[_vModelCheckbox, () => _ctx.state.allDone]])
+  _withDirectives(n11, [[_vShow, () => _ctx.state.todos.length]])
+  _withDirectives(n17, [[_vShow, () => _ctx.state.todos.length > _ctx.state.remaining]])
+  _withDirectives(n18, [[_vShow, () => _ctx.state.todos.length]])
+  _on(n1, "update:modelValue", $event => ((_ctx.state.newTodo) = $event))
+  _on(n1, "keyup", _withKeys((...args) => (_ctx.addTodo && _ctx.addTodo(...args)), ["enter"]))
+  _on(n2, "update:modelValue", $event => ((_ctx.state.allDone) = $event))
+  const n3 = _createFor(() => (_ctx.state.filteredTodos), (_block) => {
+    const n4 = t0()
+    const { 0: [n9, { 0: [, { 0: [n5], 1: [n6], 2: [n7],}], 1: [n8],}],} = _children(n4)
+    _withDirectives(n5, [[_vModelCheckbox, () => _block.s[0].completed]])
+    _withDirectives(n8, [[_vModelText, () => _block.s[0].title], [_resolveDirective("vTodoFocus"), () => _block.s[0] === _ctx.state.editedTodo]])
+    _on(n5, "update:modelValue", $event => ((_block.s[0].completed) = $event))
+    _on(n6, "dblclick", $event => (_ctx.editTodo(_block.s[0])))
+    _on(n7, "click", $event => (_ctx.removeTodo(_block.s[0])))
+    _on(n8, "update:modelValue", $event => ((_block.s[0].title) = $event))
+    _on(n8, "blur", $event => (_ctx.doneEdit(_block.s[0])))
+    _on(n8, "keyup", _withKeys($event => (_ctx.doneEdit(_block.s[0])), ["enter"]))
+    _on(n8, "keyup", _withKeys($event => (_ctx.cancelEdit(_block.s[0])), ["escape"]))
+    const _updateEffect = () => {
+      const [todo] = _block.s
+      _setText(n6, todo.title)
+      _setClass(n9, { completed: todo.completed, editing: todo === _ctx.state.editedTodo })
+    }
+    _renderEffect(_updateEffect)
+    return [n4, _updateEffect]
+  })
+  _append(n10, n3)
+  _on(n17, "click", (...args) => (_ctx.removeCompleted && _ctx.removeCompleted(...args)))
+  _renderEffect(() => {
+    _setText(n12, _ctx.state.remaining)
+  })
+  _renderEffect(() => {
+    _setText(n13, _ctx.state.remainingText)
+  })
+  _renderEffect(() => {
+    _setClass(n14, { selected: _ctx.state.visibility === 'all' })
+  })
+  _renderEffect(() => {
+    _setClass(n15, { selected: _ctx.state.visibility === 'active' })
+  })
+  _renderEffect(() => {
+    _setClass(n16, { selected: _ctx.state.visibility === 'completed' })
+  })
+  return n0
+}
+
+_sfc_main.render = _sfc_render
+render(_sfc_main, {}, '#app')
+</script>
