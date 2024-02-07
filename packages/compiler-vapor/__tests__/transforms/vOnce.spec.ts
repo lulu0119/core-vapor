@@ -29,17 +29,24 @@ describe('compiler: v-once', () => {
     expect(ir.effect).lengthOf(0)
     expect(ir.operation).toMatchObject([
       {
-        id: 1,
         type: IRNodeTypes.CREATE_TEXT_NODE,
+        id: 1,
       },
       {
         element: 1,
         type: IRNodeTypes.SET_TEXT,
-        value: {
-          type: NodeTypes.SIMPLE_EXPRESSION,
-          content: 'msg',
-          isStatic: false,
-        },
+        values: [
+          {
+            type: NodeTypes.SIMPLE_EXPRESSION,
+            content: 'msg',
+            isStatic: false,
+          },
+          {
+            type: NodeTypes.SIMPLE_EXPRESSION,
+            content: ' ',
+            isStatic: true,
+          },
+        ],
       },
       {
         element: 2,
@@ -50,11 +57,13 @@ describe('compiler: v-once', () => {
             content: 'class',
             isStatic: true,
           },
-          value: {
-            type: NodeTypes.SIMPLE_EXPRESSION,
-            content: 'clz',
-            isStatic: false,
-          },
+          values: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'clz',
+              isStatic: false,
+            },
+          ],
         },
       },
       {
@@ -81,11 +90,13 @@ describe('compiler: v-once', () => {
             content: 'id',
             isStatic: true,
           },
-          value: {
-            type: NodeTypes.SIMPLE_EXPRESSION,
-            content: 'foo',
-            isStatic: false,
-          },
+          values: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'foo',
+              isStatic: false,
+            },
+          ],
         },
       },
     ])
@@ -111,11 +122,13 @@ describe('compiler: v-once', () => {
             content: 'id',
             isStatic: true,
           },
-          value: {
-            type: NodeTypes.SIMPLE_EXPRESSION,
-            content: 'foo',
-            isStatic: false,
-          },
+          values: [
+            {
+              type: NodeTypes.SIMPLE_EXPRESSION,
+              content: 'foo',
+              isStatic: false,
+            },
+          ],
         },
       },
     ])

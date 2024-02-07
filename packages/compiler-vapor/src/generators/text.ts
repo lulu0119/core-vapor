@@ -7,12 +7,13 @@ export function genSetText(
   context: CodegenContext,
 ): CodeFragment[] {
   const { call, vaporHelper } = context
+  const { values } = oper
   return [
     NEWLINE,
     ...call(
       vaporHelper('setText'),
       `n${oper.element}`,
-      genExpression(oper.value, context),
+      ...values.map(value => genExpression(value, context)),
     ),
   ]
 }
