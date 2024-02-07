@@ -164,25 +164,49 @@ export default defineComponent({
   <section class="todoapp">
     <header class="header">
       <h1>todos</h1>
-      <input class="new-todo" autofocus autocomplete="off" placeholder="What needs to be done?" v-model="state.newTodo"
-        @keyup.enter="addTodo" />
+      <input
+        class="new-todo"
+        autofocus
+        autocomplete="off"
+        placeholder="What needs to be done?"
+        v-model="state.newTodo"
+        @keyup.enter="addTodo"
+      />
     </header>
     <section class="main" v-show="state.todos.length">
-      <input id="toggle-all" class="toggle-all" type="checkbox" v-model="state.allDone" :checked="state.allDone"
-        @change="state.allDone = $event.target.checked" />
+      <input
+        id="toggle-all"
+        class="toggle-all"
+        type="checkbox"
+        v-model="state.allDone"
+        :checked="state.allDone"
+        @change="state.allDone = $event.target.checked"
+      />
       <label for="toggle-all">Mark all as complete</label>
       <ul class="todo-list">
-        <li v-for="todo in state.filteredTodos" class="todo" :key="todo.id" :class="{
-          completed: todo.completed,
-          editing: todo === state.editedTodo,
-        }">
+        <li
+          v-for="todo in state.filteredTodos"
+          class="todo"
+          :key="todo.id"
+          :class="{
+            completed: todo.completed,
+            editing: todo === state.editedTodo,
+          }"
+        >
           <div class="view">
             <input class="toggle" type="checkbox" v-model="todo.completed" />
             <label @dblclick="editTodo(todo)">{{ todo.title }}</label>
             <button class="destroy" @click="removeTodo(todo)"></button>
           </div>
-          <input class="edit" type="text" v-model="todo.title" v-todo-focus="todo === state.editedTodo"
-            @blur="doneEdit(todo)" @keyup.enter="doneEdit(todo)" @keyup.escape="cancelEdit(todo)" />
+          <input
+            class="edit"
+            type="text"
+            v-model="todo.title"
+            v-todo-focus="todo === state.editedTodo"
+            @blur="doneEdit(todo)"
+            @keyup.enter="doneEdit(todo)"
+            @keyup.escape="cancelEdit(todo)"
+          />
         </li>
       </ul>
     </section>
@@ -193,17 +217,31 @@ export default defineComponent({
       </span>
       <ul class="filters">
         <li>
-          <a href="#/all" :class="{ selected: state.visibility === 'all' }">All</a>
+          <a href="#/all" :class="{ selected: state.visibility === 'all' }"
+            >All</a
+          >
         </li>
         <li>
-          <a href="#/active" :class="{ selected: state.visibility === 'active' }">Active</a>
+          <a
+            href="#/active"
+            :class="{ selected: state.visibility === 'active' }"
+            >Active</a
+          >
         </li>
         <li>
-          <a href="#/completed" :class="{ selected: state.visibility === 'completed' }">Completed</a>
+          <a
+            href="#/completed"
+            :class="{ selected: state.visibility === 'completed' }"
+            >Completed</a
+          >
         </li>
       </ul>
 
-      <button class="clear-completed" @click="removeCompleted" v-show="state.todos.length > state.remaining">
+      <button
+        class="clear-completed"
+        @click="removeCompleted"
+        v-show="state.todos.length > state.remaining"
+      >
         Clear completed
       </button>
     </footer>
