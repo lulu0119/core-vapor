@@ -19,14 +19,12 @@ import { EMPTY_OBJ, NOOP, extend, isArray, isString } from '@vue/shared'
 import {
   type BlockIRNode,
   DynamicFlag,
-  type FragmentFactoryIRNode,
   type HackOptions,
   type IRDynamicInfo,
   type IRExpression,
   IRNodeTypes,
   type OperationNode,
   type RootIRNode,
-  type TemplateFactoryIRNode,
   type VaporDirectiveNode,
 } from './ir'
 
@@ -190,29 +188,22 @@ function createRootContext(
     template: '',
     childrenTemplate: [],
     registerTemplate() {
-      let templateNode: TemplateFactoryIRNode | FragmentFactoryIRNode
+      this.template += this.childrenTemplate.filter(Boolean).join('')
+      if (!this.template) {
+        return -1
+      }
 
-      const existing = root.template.findIndex(t =>
-        this.template
-          ? t.type === IRNodeTypes.TEMPLATE_FACTORY &&
-            t.template === this.template
-          : t.type === IRNodeTypes.FRAGMENT_FACTORY,
+      const existing = root.template.findIndex(
+        t => t.template === this.template,
       )
       if (existing !== -1) {
         return (this.block.templateIndex = existing)
       }
 
-      if (this.template) {
-        templateNode = {
-          type: IRNodeTypes.TEMPLATE_FACTORY,
-          template: this.template,
-        }
-      } else {
-        templateNode = {
-          type: IRNodeTypes.FRAGMENT_FACTORY,
-        }
-      }
-      root.template.push(templateNode)
+      root.template.push({
+        type: IRNodeTypes.TEMPLATE_FACTORY,
+        template: this.template,
+      })
       return (this.block.templateIndex = root.template.length - 1)
     },
     registerOperation(...node) {
@@ -261,7 +252,6 @@ export function transform(
   const context = createRootContext(ir, root, options)
 
   transformNode(context)
-  context.registerTemplate()
 
   return ir
 }
@@ -311,8 +301,9 @@ function transformNode(
     exitFns[i]()
   }
 
-  if (context.node.type === NodeTypes.ROOT)
-    context.template += context.childrenTemplate.filter(Boolean).join('')
+  if (context.node.type === NodeTypes.ROOT) {
+    context.registerTemplate()
+  }
 }
 
 function transformChildren(context: TransformContext<RootNode | ElementNode>) {
@@ -333,8 +324,22 @@ function processDynamicChildren(
 ) {
   let prevDynamics: IRDynamicInfo[] = []
   let hasStaticTemplate = false
+  const children = context.dynamic.children
 
-  for (const [index, child] of context.dynamic.children.entries()) {
+  const isFragment = context.block.node === context.node
+  const allNonTemplate = children.every(
+    child => child.flags & DynamicFlag.NON_TEMPLATE,
+  )
+  // all non-template: don't gen fragment but return array directly
+  if (isFragment && allNonTemplate) {
+    context.block.returns = children
+      .filter(child => child.flags & DynamicFlag.INSERT)
+      .map(child => child.id!)
+    return
+  }
+
+  // mixed: insert with anchor
+  for (const [index, child] of children.entries()) {
     if (child.flags & DynamicFlag.INSERT) {
       prevDynamics.push(child)
     }
