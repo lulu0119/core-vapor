@@ -135,6 +135,12 @@ const _sfc_main = defineComponent({
       state.todos = filters.active(state.todos)
     }
 
+    function vTodoFocus (el, { value }) {
+      if (value) {
+        el.focus()
+      }
+    }
+
     return {
       state,
       addTodo,
@@ -142,80 +148,80 @@ const _sfc_main = defineComponent({
       editTodo,
       doneEdit,
       cancelEdit,
-      removeCompleted
+      removeCompleted,
+      vTodoFocus
     }
   },
-
-  directives: {
-    'todo-focus': (el, { value }) => {
-      if (value) {
-        el.focus()
-      }
-    }
-  }
 })
 
-const { children: _children, vModelText: _vModelText, withDirectives: _withDirectives, vModelCheckbox: _vModelCheckbox, vShow: _vShow, on: _on, resolveDirective: _resolveDirective, renderEffect: _renderEffect, setDynamicProp: _setDynamicProp, setText: _setText, setClass: _setClass, createFor: _createFor, append: _append, template: _template } = VueVapor;
+const { children : _children, next : _next, vModelText : _vModelText, withDirectives : _withDirectives, vModelCheckbox : _vModelCheckbox, vShow : _vShow, on : _on, delegate : _delegate, resolveDirective : _resolveDirective, setText : _setText, setClass : _setClass, renderEffect : _renderEffect, createFor : _createFor, insert : _insert, setDynamicProp : _setDynamicProp, delegateEvents : _delegateEvents, template : _template } = VueVapor
 const t0 = _template("<li><div class=\"view\"><input class=\"toggle\" type=\"checkbox\"><label></label><button class=\"destroy\"></button></div><input class=\"edit\" type=\"text\"></li>")
 const t1 = _template("<section class=\"todoapp\"><header class=\"header\"><h1>todos</h1><input class=\"new-todo\" autofocus autocomplete=\"off\" placeholder=\"What needs to be done?\"></header><section class=\"main\"><input id=\"toggle-all\" class=\"toggle-all\" type=\"checkbox\"><label for=\"toggle-all\">Mark all as complete</label><ul class=\"todo-list\"></ul></section><footer class=\"footer\"><span class=\"todo-count\"><strong></strong><span></span></span><ul class=\"filters\"><li><a href=\"#/all\">All</a></li><li><a href=\"#/active\">Active</a></li><li><a href=\"#/completed\">Completed</a></li></ul><button class=\"clear-completed\"> Clear completed </button></footer></section>")
+_delegateEvents("keyup", "dblclick", "click")
 
 function _sfc_render(_ctx) {
-  const n0 = t1()
-  const { 0: [, { 0: [, { 1: [n1],}], 1: [n11, { 0: [n2], 2: [n10],}], 2: [n18, { 0: [, { 0: [n12], 1: [n13],}], 1: [, { 0: [, { 0: [n14],}], 1: [, { 0: [n15],}], 2: [, { 0: [n16],}],}], 2: [n17],}],}],} = _children(n0)
-  _withDirectives(n1, [[_vModelText, () => _ctx.state.newTodo]])
-  _withDirectives(n2, [[_vModelCheckbox, () => _ctx.state.allDone]])
-  _withDirectives(n11, [[_vShow, () => _ctx.state.todos.length]])
-  _withDirectives(n17, [[_vShow, () => _ctx.state.todos.length > _ctx.state.remaining]])
-  _withDirectives(n18, [[_vShow, () => _ctx.state.todos.length]])
-  _on(n1, "update:modelValue", $event => ((_ctx.state.newTodo) = $event))
-  _on(n1, "keyup", () => _ctx.addTodo, undefined, {
+  const n18 = t1()
+  const n0 = _children(n18, 0, 1)
+  const n10 = _children(n18, 1)
+  const n1 = n10.firstChild
+  const n9 = _next(n1, 2)
+  const n17 = n10.nextSibling
+  const n11 = _children(n17, 0, 0)
+  const n12 = n11.nextSibling
+  const n13 = _children(n17, 1, 0, 0)
+  const n14 = _children(n17, 1, 1, 0)
+  const n15 = _children(n17, 1, 2, 0)
+  const n16 = _children(n17, 2)
+  _withDirectives(n0, [[_vModelText, () => _ctx.state.newTodo]])
+  _withDirectives(n1, [[_vModelCheckbox, () => _ctx.state.allDone]])
+  _withDirectives(n10, [[_vShow, () => _ctx.state.todos.length]])
+  _withDirectives(n16, [[_vShow, () => _ctx.state.todos.length > _ctx.state.remaining]])
+  _withDirectives(n17, [[_vShow, () => _ctx.state.todos.length]])
+  _on(n0, "update:modelValue", () => $event => (_ctx.state.newTodo = $event))
+  _delegate(n0, "keyup", () => _ctx.addTodo, {
     keys: ["enter"]
   })
-  _on(n2, "update:modelValue", $event => ((_ctx.state.allDone) = $event))
-  _on(n2, "change", () => $event => (_ctx.state.allDone = $event.target.checked))
-  const n3 = _createFor(() => (_ctx.state.filteredTodos), (_block) => {
-    const n4 = t0()
-    const { 0: [n9, { 0: [, { 0: [n5], 1: [n6], 2: [n7],}], 1: [n8],}],} = _children(n4)
-    _withDirectives(n5, [[_vModelCheckbox, () => _block.s[0].completed]])
-    _withDirectives(n8, [[_vModelText, () => _block.s[0].title], [_resolveDirective("vTodoFocus"), () => _block.s[0] === _ctx.state.editedTodo]])
-    _on(n5, "update:modelValue", $event => ((_block.s[0].completed) = $event))
-    _on(n5, "change", () => $event => (_block.s[0].completed = $event.target.checked))
-    _on(n6, "dblclick", () => $event => (_ctx.editTodo(_block.s[0])))
-    _on(n7, "click", () => $event => (_ctx.removeTodo(_block.s[0])))
-    _on(n8, "update:modelValue", $event => ((_block.s[0].title) = $event))
-    _on(n8, "blur", () => $event => (_ctx.doneEdit(_block.s[0])))
-    _on(n8, "keyup", () => $event => (_ctx.doneEdit(_block.s[0])), undefined, {
+  _on(n1, "update:modelValue", () => $event => (_ctx.state.allDone = $event))
+  _on(n1, "change", () => $event => (_ctx.state.allDone = $event.target.checked))
+  const n2 = _createFor(() => (_ctx.state.filteredTodos), (_block) => {
+    const n8 = t0()
+    const n4 = _children(n8, 0, 0)
+    const n5 = n4.nextSibling
+    const n6 = n5.nextSibling
+    const n7 = _children(n8, 1)
+    _withDirectives(n4, [[_vModelCheckbox, () => _block.s[0].completed]])
+    _withDirectives(n7, [[_vModelText, () => _block.s[0].title], [_ctx.vTodoFocus, () => _block.s[0] === _ctx.state.editedTodo]])
+    _on(n4, "update:modelValue", () => $event => (_block.s[0].completed))
+    _delegate(n5, "dblclick", () => $event => (_ctx.editTodo(_block.s[0])))
+    _delegate(n6, "click", () => $event => (_ctx.removeTodo(_block.s[0])))
+    _on(n7, "update:modelValue", () => $event => (_block.s[0].title))
+    _on(n7, "blur", () => $event => (_ctx.doneEdit(_block.s[0])))
+    _delegate(n7, "keyup", () => $event => (_ctx.doneEdit(_block.s[0])), {
       keys: ["enter"]
     })
-    _on(n8, "keyup", () => $event => (_ctx.cancelEdit(_block.s[0])), undefined, {
+    _delegate(n7, "keyup", () => $event => (_ctx.cancelEdit(_block.s[0])), {
       keys: ["escape"]
     })
-    _renderEffect(() => {
+    const _updateEffect = () => {
       const [todo] = _block.s
-      _setDynamicProp(n5, "checked", todo.completed)
-    })
-    _renderEffect(() => {
-      const [todo] = _block.s
-      _setText(n6, todo.title)
-    })
-    _renderEffect(() => {
-      const [todo] = _block.s
-      _setClass(n9, ["todo", {
+      _setText(n5, todo.title)
+      _setClass(n8, ["todo", {
             completed: todo.completed,
             editing: todo === _ctx.state.editedTodo,
           }])
-    })
-    return n4
-  })
-  _append(n10, n3)
-  _on(n17, "click", () => _ctx.removeCompleted)
-  _renderEffect(() => _setDynamicProp(n2, "checked", _ctx.state.allDone))
-  _renderEffect(() => _setText(n12, _ctx.state.remaining))
-  _renderEffect(() => _setText(n13, _ctx.state.remainingText))
-  _renderEffect(() => _setClass(n14, { selected: _ctx.state.visibility === 'all' }))
-  _renderEffect(() => _setClass(n15, { selected: _ctx.state.visibility === 'active' }))
-  _renderEffect(() => _setClass(n16, { selected: _ctx.state.visibility === 'completed' }))
-  return n0
+    }
+    _renderEffect(_updateEffect)
+    return [n8, _updateEffect]
+  }, (todo) => (todo.id))
+  _insert(n2, n9)
+  _delegate(n16, "click", () => _ctx.removeCompleted)
+  _renderEffect(() => _setDynamicProp(n1, "checked", _ctx.state.allDone))
+  _renderEffect(() => _setText(n11, _ctx.state.remaining))
+  _renderEffect(() => _setText(n12, _ctx.state.remainingText))
+  _renderEffect(() => _setClass(n13, { selected: _ctx.state.visibility === 'all' }))
+  _renderEffect(() => _setClass(n14, { selected: _ctx.state.visibility === 'active' }))
+  _renderEffect(() => _setClass(n15, { selected: _ctx.state.visibility === 'completed' }))
+  return n18
 }
 
 _sfc_main.render = _sfc_render
