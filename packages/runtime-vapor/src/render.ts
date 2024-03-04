@@ -1,5 +1,11 @@
 import { proxyRefs } from '@vue/reactivity'
-import { type Data, invokeArrayFns, isArray, isObject } from '@vue/shared'
+import {
+  type Data,
+  invokeArrayFns,
+  isArray,
+  isFunction,
+  isObject,
+} from '@vue/shared'
 import {
   type Component,
   type ComponentInternalInstance,
@@ -8,14 +14,13 @@ import {
   unsetCurrentInstance,
 } from './component'
 import { initProps } from './componentProps'
-import { invokeDirectiveHook } from './directive'
-import { insert, querySelector, remove } from './dom'
-import { queuePostRenderEffect } from './scheduler'
+import { invokeDirectiveHook } from './directives'
+import { insert, querySelector, remove } from './dom/element'
+import { flushPostFlushCbs, queuePostRenderEffect } from './scheduler'
 
 export const fragmentKey = Symbol(__DEV__ ? `fragmentKey` : ``)
 
 export type Block = Node | Fragment | Block[]
-export type ParentBlock = ParentNode | Block[]
 export type Fragment = {
   nodes: Block
   anchor?: Node
@@ -28,17 +33,22 @@ export function render(
   container: string | ParentNode,
 ): ComponentInternalInstance {
   const instance = createComponentInstance(comp, props)
-  initProps(instance, props)
-  return mountComponent(instance, (container = normalizeContainer(container)))
+  initProps(instance, props, !isFunction(instance.component))
+  const component = mountComponent(
+    instance,
+    (container = normalizeContainer(container)),
+  )
+  flushPostFlushCbs()
+  return component
 }
 
-export function normalizeContainer(container: string | ParentNode): ParentNode {
+function normalizeContainer(container: string | ParentNode): ParentNode {
   return typeof container === 'string'
     ? (querySelector(container) as ParentNode)
     : container
 }
 
-export function mountComponent(
+function mountComponent(
   instance: ComponentInternalInstance,
   container: ParentNode,
 ) {
@@ -46,11 +56,10 @@ export function mountComponent(
 
   const reset = setCurrentInstance(instance)
   const block = instance.scope.run(() => {
-    const { component, props, emit } = instance
-    const ctx = { expose: () => {}, emit }
+    const { component, props, emit, attrs } = instance
+    const ctx = { expose: () => {}, emit, attrs }
 
-    const setupFn =
-      typeof component === 'function' ? component : component.setup
+    const setupFn = isFunction(component) ? component : component.setup
     const stateOrNode = setupFn && setupFn(props, ctx)
 
     let block: Block | undefined

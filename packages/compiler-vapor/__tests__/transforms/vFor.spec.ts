@@ -2,6 +2,7 @@ import { makeCompile } from './_utils'
 import {
   type ForIRNode,
   IRNodeTypes,
+  transformChildren,
   transformElement,
   transformText,
   transformVBind,
@@ -11,7 +12,12 @@ import {
 import { NodeTypes } from '@vue/compiler-dom'
 
 const compileWithVFor = makeCompile({
-  nodeTransforms: [transformVFor, transformText, transformElement],
+  nodeTransforms: [
+    transformVFor,
+    transformText,
+    transformElement,
+    transformChildren,
+  ],
   directiveTransforms: {
     bind: transformVBind,
     on: transformVOn,
@@ -21,23 +27,17 @@ const compileWithVFor = makeCompile({
 describe('compiler: v-for', () => {
   test('basic v-for', () => {
     const { code, ir, vaporHelpers, helpers } = compileWithVFor(
-      `<div v-for="item of items" @click="remove(item)">{{ item }}</div>`,
+      `<div v-for="item of items" :key="item.id" @click="remove(item)">{{ item }}</div>`,
     )
 
     expect(code).matchSnapshot()
     expect(vaporHelpers).contains('createFor')
     expect(helpers.size).toBe(0)
-    expect(ir.template).lengthOf(1)
-    expect(ir.template).toMatchObject([
-      {
-        template: '<div></div>',
-        type: IRNodeTypes.TEMPLATE_FACTORY,
-      },
-    ])
-    expect(ir.operation).toMatchObject([
+    expect(ir.template).toEqual(['<div></div>'])
+    expect(ir.block.operation).toMatchObject([
       {
         type: IRNodeTypes.FOR,
-        id: 1,
+        id: 0,
         source: {
           type: NodeTypes.SIMPLE_EXPRESSION,
           content: 'items',
@@ -49,18 +49,23 @@ describe('compiler: v-for', () => {
         key: undefined,
         index: undefined,
         render: {
-          type: IRNodeTypes.BLOCK_FUNCTION,
-          templateIndex: 0,
+          type: IRNodeTypes.BLOCK,
+          dynamic: {
+            children: [{ template: 0 }],
+          },
+        },
+        keyProp: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: 'item.id',
         },
       },
     ])
-    expect(ir.returns).toEqual([1])
-    expect(ir.dynamic).toMatchObject({
-      id: 0,
-      children: { 0: { id: 1 } },
+    expect(ir.block.returns).toEqual([0])
+    expect(ir.block.dynamic).toMatchObject({
+      children: [{ id: 0 }],
     })
-    expect(ir.effect).toEqual([])
-    expect((ir.operation[0] as ForIRNode).render.effect).lengthOf(1)
+    expect(ir.block.effect).toEqual([])
+    expect((ir.block.operation[0] as ForIRNode).render.effect).lengthOf(1)
   })
 
   test('multi effect', () => {

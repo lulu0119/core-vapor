@@ -1,6 +1,7 @@
 import { makeCompile } from './_utils'
 import {
   IRNodeTypes,
+  transformChildren,
   transformElement,
   transformVBind,
   transformVOn,
@@ -8,7 +9,7 @@ import {
 import { NodeTypes } from '@vue/compiler-core'
 
 const compileWithElementTransform = makeCompile({
-  nodeTransforms: [transformElement],
+  nodeTransforms: [transformElement, transformChildren],
   directiveTransforms: {
     bind: transformVBind,
     on: transformVOn,
@@ -16,7 +17,7 @@ const compileWithElementTransform = makeCompile({
 })
 
 describe('compiler: element transform', () => {
-  test.todo('baisc')
+  test.todo('basic')
 
   test('static props', () => {
     const { code, ir } = compileWithElementTransform(
@@ -24,13 +25,13 @@ describe('compiler: element transform', () => {
     )
     expect(code).toMatchSnapshot()
     expect(code).contains('<div id=\\"foo\\" class=\\"bar\\"></div>"')
-    expect(ir.effect.length).toBe(0)
+    expect(ir.block.effect).lengthOf(0)
   })
 
   test('v-bind="obj"', () => {
     const { code, ir } = compileWithElementTransform(`<div v-bind="obj" />`)
     expect(code).toMatchSnapshot()
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -42,7 +43,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_DYNAMIC_PROPS,
-            element: 1,
+            element: 0,
             props: [
               {
                 type: 4,
@@ -54,7 +55,7 @@ describe('compiler: element transform', () => {
         ],
       },
     ])
-    expect(code).contains('_setDynamicProps(n1, _ctx.obj)')
+    expect(code).contains('_setDynamicProps(n0, _ctx.obj)')
   })
 
   test('v-bind="obj" after static prop', () => {
@@ -62,7 +63,7 @@ describe('compiler: element transform', () => {
       `<div id="foo" v-bind="obj" />`,
     )
     expect(code).toMatchSnapshot()
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -74,7 +75,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_DYNAMIC_PROPS,
-            element: 1,
+            element: 0,
             props: [
               [
                 {
@@ -102,7 +103,7 @@ describe('compiler: element transform', () => {
         ],
       },
     ])
-    expect(code).contains('_setDynamicProps(n1, { id: "foo" }, _ctx.obj)')
+    expect(code).contains('_setDynamicProps(n0, { id: "foo" }, _ctx.obj)')
   })
 
   test('v-bind="obj" before static prop', () => {
@@ -110,7 +111,7 @@ describe('compiler: element transform', () => {
       `<div v-bind="obj" id="foo" />`,
     )
     expect(code).toMatchSnapshot()
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -122,7 +123,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_DYNAMIC_PROPS,
-            element: 1,
+            element: 0,
             props: [
               {
                 type: NodeTypes.SIMPLE_EXPRESSION,
@@ -150,7 +151,7 @@ describe('compiler: element transform', () => {
         ],
       },
     ])
-    expect(code).contains('_setDynamicProps(n1, _ctx.obj, { id: "foo" })')
+    expect(code).contains('_setDynamicProps(n0, _ctx.obj, { id: "foo" })')
   })
 
   test('v-bind="obj" between static props', () => {
@@ -158,7 +159,7 @@ describe('compiler: element transform', () => {
       `<div id="foo" v-bind="obj" class="bar" />`,
     )
     expect(code).toMatchSnapshot()
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -170,7 +171,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_DYNAMIC_PROPS,
-            element: 1,
+            element: 0,
             props: [
               [
                 {
@@ -215,7 +216,7 @@ describe('compiler: element transform', () => {
       },
     ])
     expect(code).contains(
-      '_setDynamicProps(n1, { id: "foo" }, _ctx.obj, { class: "bar" })',
+      '_setDynamicProps(n0, { id: "foo" }, _ctx.obj, { class: "bar" })',
     )
   })
 
@@ -225,10 +226,10 @@ describe('compiler: element transform', () => {
     )
     expect(code).toMatchSnapshot()
 
-    expect(ir.operation).toMatchObject([
+    expect(ir.block.operation).toMatchObject([
       {
         type: IRNodeTypes.SET_EVENT,
-        element: 1,
+        element: 0,
         key: {
           type: NodeTypes.SIMPLE_EXPRESSION,
           content: 'click',
@@ -261,7 +262,7 @@ describe('compiler: element transform', () => {
     )
     expect(code).toMatchSnapshot()
 
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -273,7 +274,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_PROP,
-            element: 1,
+            element: 0,
             prop: {
               key: {
                 type: NodeTypes.SIMPLE_EXPRESSION,
@@ -306,7 +307,7 @@ describe('compiler: element transform', () => {
 
     expect(code).toMatchSnapshot()
 
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -318,7 +319,7 @@ describe('compiler: element transform', () => {
         operations: [
           {
             type: IRNodeTypes.SET_PROP,
-            element: 1,
+            element: 0,
             prop: {
               key: {
                 type: NodeTypes.SIMPLE_EXPRESSION,

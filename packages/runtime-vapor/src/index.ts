@@ -47,16 +47,71 @@ export {
   type FunctionalComponent,
   type SetupFn,
 } from './component'
-export * from './render'
-export * from './renderWatch'
-export * from './template'
-export * from './apiWatch'
-export * from './directive'
-export * from './dom'
-export * from './apiLifecycle'
-export * from './if'
-export * from './for'
-export { defineComponent } from './apiDefineComponent'
+export { render, unmountComponent } from './render'
+export { renderEffect, renderWatch } from './renderWatch'
+export {
+  watch,
+  watchEffect,
+  watchPostEffect,
+  watchSyncEffect,
+  type WatchEffect,
+  type WatchOptions,
+  type WatchOptionsBase,
+  type WatchCallback,
+  type WatchSource,
+  type WatchStopHandle,
+} from './apiWatch'
+export {
+  withDirectives,
+  resolveDirective,
+  type Directive,
+  type DirectiveBinding,
+  type DirectiveHook,
+  type ObjectDirective,
+  type FunctionDirective,
+  type DirectiveArguments,
+  type DirectiveModifiers,
+} from './directives'
 
-export * from './directives/vShow'
-export * from './directives/vModel'
+export { template, children, next } from './dom/template'
+export { insert, prepend, remove, createTextNode } from './dom/element'
+export { setStyle } from './dom/style'
+export {
+  setText,
+  setHtml,
+  setClass,
+  setAttr,
+  setDOMProp,
+  setDynamicProp,
+  setDynamicProps,
+} from './dom/prop'
+export { on, delegate, delegateEvents } from './dom/event'
+export { setRef } from './dom/templateRef'
+
+export { defineComponent } from './apiDefineComponent'
+export {
+  onBeforeMount,
+  onMounted,
+  onBeforeUpdate,
+  onUpdated,
+  onBeforeUnmount,
+  onUnmounted,
+  // onActivated,
+  // onDeactivated,
+  // onRenderTracked,
+  // onRenderTriggered,
+  onErrorCaptured,
+  // onServerPrefetch,
+} from './apiLifecycle'
+export { createIf } from './if'
+export { createFor } from './for'
+
+// **Internal** DOM-only runtime directive helpers
+export {
+  vModelText,
+  vModelCheckbox,
+  vModelRadio,
+  vModelSelect,
+  vModelDynamic,
+} from './directives/vModel'
+export { vShow } from './directives/vShow'

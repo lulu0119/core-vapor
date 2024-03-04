@@ -1,9 +1,14 @@
 import { BindingTypes, DOMErrorCodes, NodeTypes } from '@vue/compiler-dom'
-import { IRNodeTypes, transformElement, transformVText } from '../../src'
+import {
+  IRNodeTypes,
+  transformChildren,
+  transformElement,
+  transformVText,
+} from '../../src'
 import { makeCompile } from './_utils'
 
 const compileWithVText = makeCompile({
-  nodeTransforms: [transformElement],
+  nodeTransforms: [transformElement, transformChildren],
   directiveTransforms: {
     text: transformVText,
   },
@@ -23,9 +28,9 @@ describe('v-text', () => {
     expect(vaporHelpers).contains('setText')
     expect(helpers.size).toBe(0)
 
-    expect(ir.operation).toEqual([])
+    expect(ir.block.operation).toEqual([])
 
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -37,7 +42,7 @@ describe('v-text', () => {
         operations: [
           {
             type: IRNodeTypes.SET_TEXT,
-            element: 1,
+            element: 0,
             values: [
               {
                 type: NodeTypes.SIMPLE_EXPRESSION,
@@ -63,9 +68,9 @@ describe('v-text', () => {
     ])
 
     // children should have been removed
-    expect(ir.template).toMatchObject([{ template: '<div></div>' }])
+    expect(ir.template).toEqual(['<div></div>'])
 
-    expect(ir.effect).toMatchObject([
+    expect(ir.block.effect).toMatchObject([
       {
         expressions: [
           {
@@ -77,7 +82,7 @@ describe('v-text', () => {
         operations: [
           {
             type: IRNodeTypes.SET_TEXT,
-            element: 1,
+            element: 0,
             values: [
               {
                 type: NodeTypes.SIMPLE_EXPRESSION,

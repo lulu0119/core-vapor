@@ -1,30 +1,27 @@
 import {
   BindingTypes,
   NewlineType,
+  type SimpleExpressionNode,
   type SourceLocation,
   advancePositionWithClone,
   isInDestructureAssignment,
   isStaticProperty,
   walkIdentifiers,
 } from '@vue/compiler-dom'
-import { isGloballyAllowed, isString, makeMap } from '@vue/shared'
 import type { Identifier } from '@babel/types'
-import type { IRExpression } from '../ir'
-import {
-  type CodeFragment,
-  type CodegenContext,
-  buildCodeFragment,
-} from '../generate'
+import type { CodegenContext } from '../generate'
 import type { Node } from '@babel/types'
+import { isConstantExpression } from '../utils'
+import { type CodeFragment, buildCodeFragment } from './utils'
 
 export function genExpression(
-  node: IRExpression,
+  node: SimpleExpressionNode,
   context: CodegenContext,
+  assignment?: string,
 ): CodeFragment[] {
   const {
     options: { prefixIdentifiers },
   } = context
-  if (isString(node)) return [node]
 
   const { content: rawExpr, ast, isStatic, loc } = node
   if (isStatic) {
@@ -37,15 +34,14 @@ export function genExpression(
     !node.content.trim() ||
     // there was a parsing error
     ast === false ||
-    isGloballyAllowed(rawExpr) ||
-    isLiteralWhitelisted(rawExpr)
+    isConstantExpression(node)
   ) {
-    return [[rawExpr, NewlineType.None, loc]]
+    return [[rawExpr, NewlineType.None, loc], assignment && ` = ${assignment}`]
   }
 
   // the expression is a simple identifier
   if (ast === null) {
-    return genIdentifier(rawExpr, context, loc)
+    return genIdentifier(rawExpr, context, loc, assignment)
   }
 
   const ids: Identifier[] = []
@@ -83,6 +79,7 @@ export function genExpression(
             end: advancePositionWithClone(node.loc.start, source, end),
             source,
           },
+          assignment,
           id,
           parentStack[parentStack.length - 1],
           parentStack,
@@ -99,12 +96,11 @@ export function genExpression(
   }
 }
 
-const isLiteralWhitelisted = /*#__PURE__*/ makeMap('true,false,null,this')
-
 function genIdentifier(
   raw: string,
   { options, vaporHelper, identifiers }: CodegenContext,
   loc?: SourceLocation,
+  assignment?: string,
   id?: Identifier,
   parent?: Node,
   parentStack?: Node[],
@@ -118,7 +114,7 @@ function genIdentifier(
   }
 
   let prefix: string | undefined
-  if (isStaticProperty(parent!) && parent.shorthand) {
+  if (isStaticProperty(parent) && parent.shorthand) {
     // property shorthand like { foo }, we need to add the key since
     // we rewrite the value
     prefix = `${raw}: `
@@ -126,8 +122,13 @@ function genIdentifier(
 
   if (inline) {
     switch (bindingMetadata[raw]) {
+      case BindingTypes.SETUP_LET:
+        name = raw = assignment
+          ? `_isRef(${raw}) ? (${raw}.value = ${assignment}) : (${raw} = ${assignment})`
+          : unref()
+        break
       case BindingTypes.SETUP_REF:
-        name = raw = `${raw}.value`
+        name = raw = withAssignment(`${raw}.value`)
         break
       case BindingTypes.SETUP_MAYBE_REF:
         // ({ x } = y)
@@ -146,11 +147,22 @@ function genIdentifier(
         raw =
           isAssignmentLVal || isUpdateArg || isDestructureAssignment
             ? (name = `${raw}.value`)
-            : `${vaporHelper('unref')}(${raw})`
+            : assignment
+              ? `${vaporHelper('isRef')}(${raw}) ? (${raw}.value = ${assignment}) : null`
+              : unref()
         break
+      default:
+        raw = withAssignment(raw)
     }
   } else {
-    raw = `_ctx.${raw}`
+    raw = withAssignment(`_ctx.${raw}`)
   }
   return [prefix, [raw, NewlineType.None, loc, name]]
+
+  function withAssignment(s: string) {
+    return assignment ? `${s} = ${assignment}` : s
+  }
+  function unref() {
+    return `${vaporHelper('unref')}(${raw})`
+  }
 }

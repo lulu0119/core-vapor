@@ -11,7 +11,7 @@ import {
 import {
   extend,
   isBuiltInDirective,
-  isReservedProp,
+  isVaporReservedProp,
   isVoidTag,
 } from '@vue/shared'
 import type {
@@ -25,6 +25,7 @@ import {
   type IRProps,
   type VaporDirectiveNode,
 } from '../ir'
+import { EMPTY_EXPRESSION } from './utils'
 
 export const transformElement: NodeTransform = (node, context) => {
   return function postTransformElement() {
@@ -52,6 +53,10 @@ export const transformElement: NodeTransform = (node, context) => {
         isComponent,
       )
     }
+    const { scopeId } = context.options
+    if (scopeId) {
+      context.template += ` ${scopeId}`
+    }
     context.template += `>` + context.childrenTemplate.join('')
 
     // TODO remove unnecessary close tag, e.g. if it's the last element of the template
@@ -71,14 +76,6 @@ function buildProps(
   const dynamicExpr: SimpleExpressionNode[] = []
   let results: DirectiveTransformResult[] = []
 
-  function pushDynamicExpressions(
-    ...exprs: (SimpleExpressionNode | undefined)[]
-  ) {
-    for (const expr of exprs) {
-      if (expr && !expr.isStatic) dynamicExpr.push(expr)
-    }
-  }
-
   function pushMergeArg() {
     if (results.length) {
       dynamicArgs.push(dedupeProperties(results))
@@ -93,7 +90,7 @@ function buildProps(
       !prop.arg
     ) {
       if (prop.exp) {
-        pushDynamicExpressions(prop.exp)
+        dynamicExpr.push(prop.exp)
         pushMergeArg()
         dynamicArgs.push(prop.exp)
       } else {
@@ -107,7 +104,7 @@ function buildProps(
     const result = transformProp(prop, node, context)
     if (result) {
       results.push(result)
-      pushDynamicExpressions(result.key, result.value)
+      dynamicExpr.push(result.key, result.value)
     }
   }
 
@@ -130,12 +127,11 @@ function buildProps(
         context.template += ` ${key.content}`
         if (values[0].content) context.template += `="${values[0].content}"`
       } else {
-        const expressions = values.filter(v => !v.isStatic)
-        context.registerEffect(expressions, [
+        context.registerEffect(values, [
           {
             type: IRNodeTypes.SET_PROP,
             element: context.reference(),
-            prop: prop,
+            prop,
           },
         ])
       }
@@ -149,16 +145,14 @@ function transformProp(
   context: TransformContext<ElementNode>,
 ): DirectiveTransformResult | void {
   const { name } = prop
-  if (isReservedProp(name)) return
+  if (isVaporReservedProp(name)) return
 
   if (prop.type === NodeTypes.ATTRIBUTE) {
     return {
       key: createSimpleExpression(prop.name, true, prop.nameLoc),
-      value: createSimpleExpression(
-        prop.value ? prop.value.content : '',
-        true,
-        prop.value && prop.value.loc,
-      ),
+      value: prop.value
+        ? createSimpleExpression(prop.value.content, true, prop.value.loc)
+        : EMPTY_EXPRESSION,
     }
   }
 

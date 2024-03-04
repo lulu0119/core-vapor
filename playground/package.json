@@ -4,15 +4,16 @@
   "type": "module",
   "scripts": {
     "dev": "node ./setup/vite.js",
-    "build": "node ./setup/vite.js build"
+    "build": "node ./setup/vite.js build",
+    "preview": "node ./setup/vite.js preview"
   },
   "dependencies": {
     "@vueuse/core": "^10.7.2",
     "vue": "workspace:*"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^4.5.0",
-    "vite": "^5.0.2",
+    "@vitejs/plugin-vue": "npm:@vue-vapor/vite-plugin-vue@0.0.0-alpha.4",
+    "vite": "^5.0.12",
     "vite-hyper-config": "^0.2.1",
     "vite-plugin-inspect": "^0.7.42"
   }

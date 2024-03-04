@@ -1,20 +1,19 @@
 import { NOOP } from '@vue/shared'
 import {
   setDynamicProp as _setDynamicProp,
-  recordPropMetadata,
   setAttr,
   setClass,
   setDOMProp,
+  setDynamicProps,
   setHtml,
-  setStyle,
   setText,
-} from '../../src'
+} from '../../src/dom/prop'
+import { setStyle } from '../../src/dom/style'
 import {
   createComponentInstance,
-  currentInstance,
-  getCurrentInstance,
   setCurrentInstance,
 } from '../../src/component'
+import { getMetadata, recordPropMetadata } from '../../src/metadata'
 
 let removeComponentInstance = NOOP
 beforeEach(() => {
@@ -43,9 +42,10 @@ describe('patchProp', () => {
       prev = recordPropMetadata(node, 'style', 'color: blue')
       expect(prev).toBe('color: red')
 
-      expect(getCurrentInstance()?.metadata.get(node)).toEqual({
-        props: { class: 'bar', style: 'color: blue' },
-      })
+      expect(getMetadata(node)).toEqual([
+        { class: 'bar', style: 'color: blue' },
+        {},
+      ])
     })
 
     test('should have different metadata for different nodes', () => {
@@ -53,22 +53,8 @@ describe('patchProp', () => {
       const node2 = {} as Node
       recordPropMetadata(node1, 'class', 'foo')
       recordPropMetadata(node2, 'class', 'bar')
-      expect(getCurrentInstance()?.metadata.get(node1)).toEqual({
-        props: { class: 'foo' },
-      })
-      expect(getCurrentInstance()?.metadata.get(node2)).toEqual({
-        props: { class: 'bar' },
-      })
-    })
-
-    test('should not record prop metadata outside of component', () => {
-      removeComponentInstance()
-      expect(currentInstance).toBeNull()
-
-      // FIXME
-      expect(() => recordPropMetadata({} as Node, 'class', 'foo')).toThrowError(
-        'cannot be used out of component',
-      )
+      expect(getMetadata(node1)).toEqual([{ class: 'foo' }, {}])
+      expect(getMetadata(node2)).toEqual([{ class: 'bar' }, {}])
     })
   })
 
@@ -90,12 +76,132 @@ describe('patchProp', () => {
       setStyle(el, 'color: red')
       expect(el.style.cssText).toBe('color: red;')
     })
-    test.fails('shoud set style with object and array property', () => {
+
+    test('should work with camelCase', () => {
+      const el = document.createElement('div')
+      setStyle(el, { fontSize: '12px' })
+      expect(el.style.cssText).toBe('font-size: 12px;')
+    })
+
+    test('shoud set style with object and array property', () => {
       const el = document.createElement('div')
       setStyle(el, { color: 'red' })
       expect(el.style.cssText).toBe('color: red;')
       setStyle(el, [{ color: 'blue' }, { fontSize: '12px' }])
       expect(el.style.cssText).toBe('color: blue; font-size: 12px;')
+    })
+
+    test('should remove if falsy value', () => {
+      const el = document.createElement('div')
+      setStyle(el, { color: undefined, borderRadius: null })
+      expect(el.style.cssText).toBe('')
+      setStyle(el, { color: 'red' })
+      expect(el.style.cssText).toBe('color: red;')
+      setStyle(el, { color: undefined, borderRadius: null })
+      expect(el.style.cssText).toBe('')
+    })
+
+    test('should work with !important', () => {
+      const el = document.createElement('div')
+      setStyle(el, { color: 'red !important' })
+      expect(el.style.cssText).toBe('color: red !important;')
+    })
+
+    test('should work with camelCase and !important', () => {
+      const el = document.createElement('div')
+      setStyle(el, { fontSize: '12px !important' })
+      expect(el.style.cssText).toBe('font-size: 12px !important;')
+    })
+
+    test('should work with multiple entries', () => {
+      const el = document.createElement('div')
+      setStyle(el, { color: 'red', marginRight: '10px' })
+      expect(el.style.getPropertyValue('color')).toBe('red')
+      expect(el.style.getPropertyValue('margin-right')).toBe('10px')
+    })
+
+    test('should patch with falsy style value', () => {
+      const el = document.createElement('div')
+      setStyle(el, { width: '100px' })
+      expect(el.style.cssText).toBe('width: 100px;')
+      setStyle(el, { width: 0 })
+      expect(el.style.cssText).toBe('width: 0px;')
+    })
+
+    test('should remove style attribute on falsy value', () => {
+      const el = document.createElement('div')
+      setStyle(el, { width: '100px' })
+      expect(el.style.cssText).toBe('width: 100px;')
+      setStyle(el, { width: undefined })
+      expect(el.style.cssText).toBe('')
+
+      setStyle(el, { width: '100px' })
+      expect(el.style.cssText).toBe('width: 100px;')
+      setStyle(el, null)
+      expect(el.hasAttribute('style')).toBe(false)
+      expect(el.style.cssText).toBe('')
+    })
+
+    test('should warn for trailing semicolons', () => {
+      const el = document.createElement('div')
+      setStyle(el, { color: 'red;' })
+      expect(
+        `Unexpected semicolon at the end of 'color' style value: 'red;'`,
+      ).toHaveBeenWarned()
+
+      setStyle(el, { '--custom': '100; ' })
+      expect(
+        `Unexpected semicolon at the end of '--custom' style value: '100; '`,
+      ).toHaveBeenWarned()
+    })
+
+    test('should not warn for trailing semicolons', () => {
+      const el = document.createElement('div')
+      setStyle(el, { '--custom': '100\\;' })
+      expect(el.style.getPropertyValue('--custom')).toBe('100\\;')
+    })
+
+    test('should work with shorthand properties', () => {
+      const el = document.createElement('div')
+      setStyle(el, { borderBottom: '1px solid red', border: '1px solid green' })
+      expect(el.style.border).toBe('1px solid green')
+      expect(el.style.borderBottom).toBe('1px solid green')
+    })
+
+    // JSDOM doesn't support custom properties on style object so we have to
+    // mock it here.
+    function mockElementWithStyle() {
+      const store: any = {}
+      return {
+        style: {
+          display: '',
+          WebkitTransition: '',
+          setProperty(key: string, val: string) {
+            store[key] = val
+          },
+          getPropertyValue(key: string) {
+            return store[key]
+          },
+        },
+      }
+    }
+
+    test('should work with css custom properties', () => {
+      const el = mockElementWithStyle()
+      setStyle(el as any, { '--theme': 'red' })
+      expect(el.style.getPropertyValue('--theme')).toBe('red')
+    })
+
+    test('should auto vendor prefixing', () => {
+      const el = mockElementWithStyle()
+      setStyle(el as any, { transition: 'all 1s' })
+      expect(el.style.WebkitTransition).toBe('all 1s')
+    })
+
+    test('should work with multiple values', () => {
+      const el = mockElementWithStyle()
+      setStyle(el as any, { display: ['-webkit-box', '-ms-flexbox', 'flex'] })
+      expect(el.style.display).toBe('flex')
     })
   })
 
@@ -292,6 +398,54 @@ describe('patchProp', () => {
     })
 
     test.todo('should be able to set something on SVG')
+  })
+
+  describe('setDynamicProps', () => {
+    test('basic set dynamic props', () => {
+      const el = document.createElement('div')
+      setDynamicProps(el, { foo: 'val' }, { bar: 'val' })
+      expect(el.getAttribute('foo')).toBe('val')
+      expect(el.getAttribute('bar')).toBe('val')
+    })
+
+    test('should merge props', () => {
+      const el = document.createElement('div')
+      setDynamicProps(el, { foo: 'val' }, { foo: 'newVal' })
+      expect(el.getAttribute('foo')).toBe('newVal')
+    })
+
+    test('should reset old props', () => {
+      const el = document.createElement('div')
+
+      setDynamicProps(el, { foo: 'val' })
+      expect(el.attributes.length).toBe(1)
+      expect(el.getAttribute('foo')).toBe('val')
+
+      setDynamicProps(el, { bar: 'val' })
+      expect(el.attributes.length).toBe(1)
+      expect(el.getAttribute('bar')).toBe('val')
+      expect(el.getAttribute('foo')).toBeNull()
+    })
+
+    test('should reset old modifier props', () => {
+      const el = document.createElement('div')
+
+      setDynamicProps(el, { ['.foo']: 'val' })
+      expect((el as any).foo).toBe('val')
+
+      setDynamicProps(el, { ['.bar']: 'val' })
+      expect((el as any).bar).toBe('val')
+      expect((el as any).foo).toBe('')
+
+      setDynamicProps(el, { ['^foo']: 'val' })
+      expect(el.attributes.length).toBe(1)
+      expect(el.getAttribute('foo')).toBe('val')
+
+      setDynamicProps(el, { ['^bar']: 'val' })
+      expect(el.attributes.length).toBe(1)
+      expect(el.getAttribute('bar')).toBe('val')
+      expect(el.getAttribute('foo')).toBeNull()
+    })
   })
 
   describe('setText', () => {

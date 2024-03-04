@@ -38,8 +38,9 @@ const isDryRun = args.dry
 let skipTests = args.skipTests
 const skipBuild = args.skipBuild
 const isCanary = args.canary
-const skipPrompts = args.skipPrompts || args.canary
-const skipGit = args.skipGit || args.canary
+const isVapor = args.vapor
+const skipPrompts = args.skipPrompts || args.canary || args.vapor
+const skipGit = args.skipGit || args.canary || args.vapor
 
 const packages = fs
   .readdirSync(path.resolve(__dirname, '../packages'))
@@ -56,7 +57,11 @@ const packages = fs
 const isCorePackage = (/** @type {string} */ pkgName) => {
   if (!pkgName) return
 
-  if (pkgName === 'vue' || pkgName === '@vue/compat') {
+  if (
+    pkgName === 'vue' ||
+    pkgName === '@vue/compat' ||
+    pkgName === '@vue/vapor'
+  ) {
     return true
   }
 
@@ -73,6 +78,18 @@ const renamePackageToCanary = (/** @type {string} */ pkgName) => {
 
   if (isCorePackage(pkgName)) {
     return `${pkgName}-canary`
+  }
+
+  return pkgName
+}
+
+const renamePackageToVapor = (/** @type {string} */ pkgName) => {
+  if (pkgName === 'vue') {
+    return '@vue-vapor/vue'
+  }
+
+  if (isCorePackage(pkgName)) {
+    return pkgName.replace(/^@vue\//, '@vue-vapor/')
   }
 
   return pkgName
@@ -119,45 +136,53 @@ async function main() {
 
   let targetVersion = args._[0]
 
-  if (isCanary) {
-    // The canary version string format is `3.yyyyMMdd.0` (or `3.yyyyMMdd.0-minor.0` for minor)
-    // Use UTC date so that it's consistent across CI and maintainers' machines
-    const date = new Date()
-    const yyyy = date.getUTCFullYear()
-    const MM = (date.getUTCMonth() + 1).toString().padStart(2, '0')
-    const dd = date.getUTCDate().toString().padStart(2, '0')
-
+  if (isCanary || isVapor) {
     const major = semver.major(currentVersion)
-    const datestamp = `${yyyy}${MM}${dd}`
-    let canaryVersion
+    let newVersion
 
-    canaryVersion = `${major}.${datestamp}.0`
-    if (args.tag && args.tag !== 'latest') {
-      canaryVersion = `${major}.${datestamp}.0-${args.tag}.0`
+    if (isCanary) {
+      // The canary version string format is `3.yyyyMMdd.0` (or `3.yyyyMMdd.0-minor.0` for minor)
+      // Use UTC date so that it's consistent across CI and maintainers' machines
+      const date = new Date()
+      const yyyy = date.getUTCFullYear()
+      const MM = (date.getUTCMonth() + 1).toString().padStart(2, '0')
+      const dd = date.getUTCDate().toString().padStart(2, '0')
+
+      const datestamp = `${yyyy}${MM}${dd}`
+      newVersion = `${major}.${datestamp}.0`
+      if (args.tag && args.tag !== 'latest') {
+        newVersion = `${major}.${datestamp}.0-${args.tag}.0`
+      }
+    } else {
+      newVersion = `${major}.2024.0-${await getSha(true)}`
     }
 
     // check the registry to avoid version collision
     // in case we need to publish more than one canary versions in a day
     try {
-      const pkgName = renamePackageToCanary('vue')
-      const { stdout } = await run(
-        'pnpm',
-        ['view', `${pkgName}@~${canaryVersion}`, 'version', '--json'],
-        { stdio: 'pipe' },
-      )
-      let versions = JSON.parse(stdout)
-      versions = Array.isArray(versions) ? versions : [versions]
-      const latestSameDayPatch = /** @type {string} */ (
-        semver.maxSatisfying(versions, `~${canaryVersion}`)
-      )
-
-      canaryVersion = /** @type {string} */ (
-        semver.inc(latestSameDayPatch, 'patch')
-      )
-      if (args.tag && args.tag !== 'latest') {
-        canaryVersion = /** @type {string} */ (
-          semver.inc(latestSameDayPatch, 'prerelease', args.tag)
+      const pkgName = isCanary
+        ? renamePackageToCanary('vue')
+        : renamePackageToVapor('vue')
+      if (isCanary) {
+        const { stdout } = await run(
+          'pnpm',
+          ['view', `${pkgName}@~${newVersion}`, 'version', '--json'],
+          { stdio: 'pipe' },
         )
+        let versions = JSON.parse(stdout)
+        versions = Array.isArray(versions) ? versions : [versions]
+        const latestSameDayPatch = /** @type {string} */ (
+          semver.maxSatisfying(versions, `~${newVersion}`)
+        )
+
+        newVersion = /** @type {string} */ (
+          semver.inc(latestSameDayPatch, 'patch')
+        )
+        if (args.tag && args.tag !== 'latest') {
+          newVersion = /** @type {string} */ (
+            semver.inc(latestSameDayPatch, 'prerelease', args.tag)
+          )
+        }
       }
     } catch (/** @type {any} */ e) {
       if (/E404/.test(e.message)) {
@@ -167,7 +192,7 @@ async function main() {
       }
     }
 
-    targetVersion = canaryVersion
+    targetVersion = newVersion
   }
 
   if (!targetVersion) {
@@ -202,8 +227,8 @@ async function main() {
 
   if (skipPrompts) {
     step(
-      isCanary
-        ? `Releasing canary version v${targetVersion}...`
+      isCanary || isVapor
+        ? `Releasing ${isCanary ? 'canary' : 'vapor'} version v${targetVersion}...`
         : `Releasing v${targetVersion}...`,
     )
   } else {
@@ -239,7 +264,7 @@ async function main() {
   if (!skipTests) {
     step('\nRunning tests...')
     if (!isDryRun) {
-      await run('pnpm', ['run', 'test'])
+      await run('pnpm', ['run', 'test', '--run'])
     } else {
       console.log(`Skipped (dry run)`)
     }
@@ -251,7 +276,11 @@ async function main() {
   step('\nUpdating cross dependencies...')
   updateVersions(
     targetVersion,
-    isCanary ? renamePackageToCanary : keepThePackageName,
+    isCanary
+      ? renamePackageToCanary
+      : isVapor
+        ? renamePackageToVapor
+        : keepThePackageName,
   )
   versionUpdated = true
 
@@ -284,7 +313,7 @@ async function main() {
 
   // update pnpm-lock.yaml
   // skipped during canary release because the package names changed and installing with `workspace:*` would fail
-  if (!isCanary) {
+  if (!isCanary && !isVapor) {
     step('\nUpdating lockfile...')
     await run(`pnpm`, ['install', '--prefer-offline'])
   }
@@ -349,7 +378,7 @@ async function getCIResult() {
   try {
     const sha = await getSha()
     const res = await fetch(
-      `https://api.github.com/repos/vuejs/core/actions/runs?head_sha=${sha}` +
+      `https://api.github.com/repos/vuejs/core-vapor/actions/runs?head_sha=${sha}` +
         `&status=success&exclude_pull_requests=true`,
     )
     const data = await res.json()
@@ -364,7 +393,7 @@ async function isInSyncWithRemote() {
   try {
     const branch = await getBranch()
     const res = await fetch(
-      `https://api.github.com/repos/vuejs/core/commits/${branch}?per_page=1`,
+      `https://api.github.com/repos/vuejs/core-vapor/commits/${branch}?per_page=1`,
     )
     const data = await res.json()
     if (data.sha === (await getSha())) {
@@ -384,12 +413,18 @@ async function isInSyncWithRemote() {
     console.error(
       pico.red('Failed to check whether local HEAD is up-to-date with remote.'),
     )
+    console.error(e)
     return false
   }
 }
 
-async function getSha() {
-  return (await execa('git', ['rev-parse', 'HEAD'])).stdout
+/**
+ * @param {boolean=} short
+ */
+async function getSha(short) {
+  return (
+    await execa('git', ['rev-parse', ...(short ? ['--short'] : []), 'HEAD'])
+  ).stdout
 }
 
 async function getBranch() {
@@ -420,7 +455,7 @@ function updatePackage(pkgRoot, version, getNewPackageName) {
   const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
   pkg.name = getNewPackageName(pkg.name)
   pkg.version = version
-  if (isCanary) {
+  if (isCanary || isVapor) {
     updateDeps(pkg, 'dependencies', version, getNewPackageName)
     updateDeps(pkg, 'peerDependencies', version, getNewPackageName)
   }

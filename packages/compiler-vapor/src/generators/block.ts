@@ -1,59 +1,47 @@
-import {
-  type BlockFunctionIRNode,
-  DynamicFlag,
-  type IRDynamicInfo,
-  IRNodeTypes,
-  type RootIRNode,
-  type WithDirectiveIRNode,
-} from '../ir'
+import { type BlockIRNode, IRNodeTypes, type WithDirectiveIRNode } from '../ir'
 import {
   type CodeFragment,
-  type CodegenContext,
   INDENT_END,
   INDENT_START,
   NEWLINE,
   buildCodeFragment,
-} from '../generate'
+} from './utils'
+import type { CodegenContext } from '../generate'
 import { genWithDirective } from './directive'
 import { genEffects, genOperations } from './operation'
+import { genChildren } from './template'
+import { genMulti } from './utils'
 
-export function genBlockFunction(
-  oper: BlockFunctionIRNode,
+export function genBlock(
+  oper: BlockIRNode,
   context: CodegenContext,
   args: CodeFragment[] = [],
+  customReturns?: (returns: CodeFragment[]) => CodeFragment[],
 ): CodeFragment[] {
   return [
     '(',
     ...args,
     ') => {',
     INDENT_START,
-    ...genBlockFunctionContent(oper, context),
+    ...genBlockContent(oper, context, customReturns),
     INDENT_END,
     NEWLINE,
     '}',
   ]
 }
 
-export function genBlockFunctionContent(
-  ir: BlockFunctionIRNode | RootIRNode,
+export function genBlockContent(
+  { dynamic, effect, operation, returns }: BlockIRNode,
   context: CodegenContext,
+  customReturns?: (returns: CodeFragment[]) => CodeFragment[],
 ): CodeFragment[] {
-  const { vaporHelper, multi } = context
   const [frag, push] = buildCodeFragment()
 
-  if (ir.templateIndex > -1) {
-    push(NEWLINE, `const n${ir.dynamic.id} = t${ir.templateIndex}()`)
+  for (const child of dynamic.children) {
+    push(...genChildren(child, context, child.id!))
   }
 
-  const children = genChildren(ir.dynamic.children)
-  if (children) {
-    push(
-      NEWLINE,
-      `const ${children} = ${vaporHelper('children')}(n${ir.dynamic.id})`,
-    )
-  }
-
-  const directiveOps = ir.operation.filter(
+  const directiveOps = operation.filter(
     (oper): oper is WithDirectiveIRNode =>
       oper.type === IRNodeTypes.WITH_DIRECTIVE,
   )
@@ -61,49 +49,18 @@ export function genBlockFunctionContent(
     push(...genWithDirective(directives, context))
   }
 
-  push(...genOperations(ir.operation, context))
-  push(...(context.genEffect || genEffects)(ir.effect, context))
-  if (ir.returns) {
-    push(
-      NEWLINE,
-      `return `,
-      ...multi(['[', ']', ', '], ...ir.returns.map(n => `n${n}`)),
-    )
-  } else {
-    push(NEWLINE, `return n${ir.dynamic.id}`)
-  }
+  push(...genOperations(operation, context))
+  push(...(context.genEffect || genEffects)(effect, context))
+
+  push(NEWLINE, `return `)
+
+  const returnsCode: CodeFragment[] =
+    returns.length > 1
+      ? genMulti(['[', ']', ', '], ...returns.map(n => `n${n}`))
+      : [`n${returns[0]}`]
+  push(...(customReturns ? customReturns(returnsCode) : returnsCode))
 
   return frag
-}
-
-function genChildren(children: IRDynamicInfo[]) {
-  let code = ''
-  let offset = 0
-
-  for (const [index, child] of children.entries()) {
-    if (child.flags & DynamicFlag.NON_TEMPLATE) {
-      offset--
-    }
-
-    const idx = Number(index) + offset
-    const id =
-      child.flags & DynamicFlag.REFERENCED
-        ? child.flags & DynamicFlag.INSERT
-          ? child.anchor
-          : child.id
-        : null
-    const childrenString = genChildren(child.children)
-
-    if (id !== null || childrenString) {
-      code += ` ${idx}: [`
-      if (id !== null) code += `n${id}`
-      if (childrenString) code += `, ${childrenString}`
-      code += '],'
-    }
-  }
-
-  if (!code) return ''
-  return `{${code}}`
 }
 
 function groupDirective(ops: WithDirectiveIRNode[]): WithDirectiveIRNode[][] {

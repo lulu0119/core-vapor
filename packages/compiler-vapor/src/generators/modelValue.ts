@@ -1,7 +1,8 @@
-import { camelize, isString } from '@vue/shared'
+import { camelize } from '@vue/shared'
 import { genExpression } from './expression'
 import type { SetModelValueIRNode } from '../ir'
-import { type CodeFragment, type CodegenContext, NEWLINE } from '../generate'
+import type { CodegenContext } from '../generate'
+import { type CodeFragment, NEWLINE, genCall } from './utils'
 
 export function genSetModelValue(
   oper: SetModelValueIRNode,
@@ -9,22 +10,21 @@ export function genSetModelValue(
 ): CodeFragment[] {
   const {
     vaporHelper,
-    call,
+
     options: { isTS },
   } = context
 
-  const name = isString(oper.key)
-    ? [JSON.stringify(`update:${camelize(oper.key)}`)]
+  const name = oper.key.isStatic
+    ? [JSON.stringify(`update:${camelize(oper.key.content)}`)]
     : ['`update:${', ...genExpression(oper.key, context), '}`']
   const handler = [
-    (isTS ? `($event: any)` : `$event`) + ' => ((',
-    // TODO handle not a ref
-    ...genExpression(oper.value, context),
-    ') = $event)',
+    `() => ${isTS ? `($event: any)` : `$event`} => (`,
+    ...genExpression(oper.value, context, '$event'),
+    ')',
   ]
 
   return [
     NEWLINE,
-    ...call(vaporHelper('on'), `n${oper.element}`, name, handler),
+    ...genCall(vaporHelper('on'), `n${oper.element}`, name, handler),
   ]
 }

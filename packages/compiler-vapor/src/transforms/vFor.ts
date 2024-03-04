@@ -7,17 +7,17 @@ import {
 import {
   type TransformContext,
   createStructuralDirectiveTransform,
-  genDefaultDynamic,
-  wrapTemplate,
 } from '../transform'
 import {
-  type BlockFunctionIRNode,
+  type BlockIRNode,
   DynamicFlag,
   type IRDynamicInfo,
   IRNodeTypes,
   type VaporDirectiveNode,
 } from '../ir'
 import { extend } from '@vue/shared'
+import { findProp, propToExpression } from '../utils'
+import { genDefaultDynamic, wrapTemplate } from './utils'
 
 export const transformVFor = createStructuralDirectiveTransform(
   'for',
@@ -45,18 +45,20 @@ export function processFor(
 
   const { source, value, key, index } = parseResult
 
+  const keyProp = findProp(node, 'key')
+  const keyProperty = keyProp && propToExpression(keyProp)
   context.node = node = wrapTemplate(node, ['for'])
   context.dynamic.flags |= DynamicFlag.NON_TEMPLATE | DynamicFlag.INSERT
   const id = context.reference()
-  const render: BlockFunctionIRNode = {
-    type: IRNodeTypes.BLOCK_FUNCTION,
+  const render: BlockIRNode = {
+    type: IRNodeTypes.BLOCK,
     node,
-    templateIndex: -1,
     dynamic: extend(genDefaultDynamic(), {
       flags: DynamicFlag.REFERENCED,
     } satisfies Partial<IRDynamicInfo>),
     effect: [],
     operation: [],
+    returns: [],
   }
   const exitBlock = context.enterBlock(render)
   context.reference()
@@ -71,6 +73,7 @@ export function processFor(
       value: value as SimpleExpressionNode | undefined,
       key: key as SimpleExpressionNode | undefined,
       index: index as SimpleExpressionNode | undefined,
+      keyProp: keyProperty,
       render,
     })
   }

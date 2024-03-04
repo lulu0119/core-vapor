@@ -6,24 +6,21 @@ import {
   looseIndexOf,
   looseToNumber,
 } from '@vue/shared'
-import type { ComponentInternalInstance } from '../component'
 import type {
   DirectiveBinding,
   DirectiveHook,
   DirectiveHookName,
   ObjectDirective,
-} from '../directive'
+} from '../directives'
 import { addEventListener } from '../dom/event'
 import { nextTick } from '../scheduler'
 import { warn } from '../warning'
+import { MetadataKind, getMetadata } from '../metadata'
 
 type AssignerFn = (value: any) => void
-function getModelAssigner(
-  el: Element,
-  instance: ComponentInternalInstance,
-): AssignerFn {
-  const metadata = instance.metadata.get(el)!
-  const fn: any = metadata.props['onUpdate:modelValue']
+function getModelAssigner(el: Element): AssignerFn {
+  const metadata = getMetadata(el)
+  const fn: any = metadata[MetadataKind.event]['update:modelValue']
   return isArray(fn) ? value => invokeArrayFns(fn, value) : fn
 }
 
@@ -49,11 +46,13 @@ export const vModelText: ObjectDirective<
   any,
   'lazy' | 'trim' | 'number'
 > = {
-  beforeMount(el, { instance, modifiers: { lazy, trim, number } = {} }) {
-    const assigner = getModelAssigner(el, instance)
+  beforeMount(el, { modifiers: { lazy, trim, number } = {} }) {
+    const assigner = getModelAssigner(el)
     assignFnMap.set(el, assigner)
 
-    const castToNumber = number // || (vnode.props && vnode.props.type === 'number')
+    const metadata = getMetadata(el)
+    const castToNumber = number || metadata[MetadataKind.prop].type === 'number'
+
     addEventListener(el, lazy ? 'change' : 'input', e => {
       if ((e.target as any).composing) return
       let domValue: string | number = el.value
@@ -84,11 +83,8 @@ export const vModelText: ObjectDirective<
   mounted(el, { value }) {
     el.value = value == null ? '' : value
   },
-  beforeUpdate(
-    el,
-    { instance, value, modifiers: { lazy, trim, number } = {} },
-  ) {
-    assignFnMap.set(el, getModelAssigner(el, instance))
+  beforeUpdate(el, { value, modifiers: { lazy, trim, number } = {} }) {
+    assignFnMap.set(el, getModelAssigner(el))
 
     // avoid clearing unresolved text. #2302
     if ((el as any).composing) return
@@ -115,19 +111,32 @@ export const vModelText: ObjectDirective<
   },
 }
 
-// TODO
-export const vModelRadio = {}
+export const vModelRadio: ObjectDirective<HTMLInputElement> = {
+  beforeMount(el, { value }) {
+    el.checked = looseEqual(value, getValue(el))
+    assignFnMap.set(el, getModelAssigner(el))
+    addEventListener(el, 'change', () => {
+      assignFnMap.get(el)!(getValue(el))
+    })
+  },
+  beforeUpdate(el, { value, oldValue }) {
+    assignFnMap.set(el, getModelAssigner(el))
+    if (value !== oldValue) {
+      el.checked = looseEqual(value, getValue(el))
+    }
+  },
+}
 
 export const vModelSelect: ObjectDirective<HTMLSelectElement, any, 'number'> = {
   // <select multiple> value need to be deep traversed
   deep: true,
-  beforeMount(el, { value, instance, modifiers: { number = false } = {} }) {
+  beforeMount(el, { value, modifiers: { number = false } = {} }) {
     const isSetModel = isSet(value)
     addEventListener(el, 'change', () => {
       const selectedVal = Array.prototype.filter
         .call(el.options, (o: HTMLOptionElement) => o.selected)
         .map((o: HTMLOptionElement) =>
-          number ? looseToNumber(getValue(o, instance)) : getValue(o, instance),
+          number ? looseToNumber(getValue(o)) : getValue(o),
         )
       assignFnMap.get(el)!(
         el.multiple
@@ -142,28 +151,20 @@ export const vModelSelect: ObjectDirective<HTMLSelectElement, any, 'number'> = {
         assigningMap.set(el, false)
       })
     })
-    assignFnMap.set(el, getModelAssigner(el, instance))
-    setSelected(el, instance, value, number)
+    assignFnMap.set(el, getModelAssigner(el))
+    setSelected(el, value, number)
   },
-  beforeUpdate(el, { instance }) {
-    assignFnMap.set(el, getModelAssigner(el, instance))
+  beforeUpdate(el) {
+    assignFnMap.set(el, getModelAssigner(el))
   },
-  updated(
-    el,
-    { value, oldValue, instance, modifiers: { number = false } = {} },
-  ) {
+  updated(el, { value, modifiers: { number = false } = {} }) {
     if (!assigningMap.get(el)) {
-      setSelected(el, instance, value, number)
+      setSelected(el, value, number)
     }
   },
 }
 
-function setSelected(
-  el: HTMLSelectElement,
-  instance: ComponentInternalInstance,
-  value: any,
-  number: boolean,
-) {
+function setSelected(el: HTMLSelectElement, value: any, number: boolean) {
   const isMultiple = el.multiple
   const isArrayValue = isArray(value)
   if (isMultiple && !isArrayValue && !isSet(value)) {
@@ -177,7 +178,7 @@ function setSelected(
 
   for (let i = 0, l = el.options.length; i < l; i++) {
     const option = el.options[i]
-    const optionValue = getValue(option, instance)
+    const optionValue = getValue(option)
     if (isMultiple) {
       if (isArrayValue) {
         const optionType = typeof optionValue
@@ -192,11 +193,9 @@ function setSelected(
       } else {
         option.selected = value.has(optionValue)
       }
-    } else {
-      if (looseEqual(getValue(option, instance), value)) {
-        if (el.selectedIndex !== i) el.selectedIndex = i
-        return
-      }
+    } else if (looseEqual(getValue(option), value)) {
+      if (el.selectedIndex !== i) el.selectedIndex = i
+      return
     }
   }
   if (!isMultiple && el.selectedIndex !== -1) {
@@ -205,22 +204,15 @@ function setSelected(
 }
 
 // retrieve raw value set via :value bindings
-function getValue(
-  el: HTMLOptionElement | HTMLInputElement,
-  instance: ComponentInternalInstance,
-) {
-  const metadata = instance.metadata.get(el)
-  return (metadata && metadata.props.value) || el.value
+function getValue(el: HTMLOptionElement | HTMLInputElement) {
+  const metadata = getMetadata(el)
+  return (metadata && metadata[MetadataKind.prop].value) || el.value
 }
 
 // retrieve raw value for true-value and false-value set via :true-value or :false-value bindings
-function getCheckboxValue(
-  el: HTMLInputElement,
-  instance: ComponentInternalInstance,
-  checked: boolean,
-) {
-  const metadata = instance.metadata.get(el)
-  const props = metadata && metadata.props
+function getCheckboxValue(el: HTMLInputElement, checked: boolean) {
+  const metadata = getMetadata(el)
+  const props = metadata && metadata[MetadataKind.prop]
   const key = checked ? 'true-value' : 'false-value'
   if (props && key in props) {
     return props[key]
@@ -233,14 +225,14 @@ function getCheckboxValue(
 
 const setChecked: DirectiveHook<HTMLInputElement> = (
   el,
-  { value, oldValue, instance },
+  { value, oldValue },
 ) => {
   if (isArray(value)) {
-    el.checked = looseIndexOf(value, getValue(el, instance)) > -1
+    el.checked = looseIndexOf(value, getValue(el)) > -1
   } else if (isSet(value)) {
-    el.checked = value.has(getValue(el, instance))
+    el.checked = value.has(getValue(el))
   } else if (value !== oldValue) {
-    el.checked = looseEqual(value, getCheckboxValue(el, instance, true))
+    el.checked = looseEqual(value, getCheckboxValue(el, true))
   }
 }
 
@@ -248,12 +240,11 @@ export const vModelCheckbox: ObjectDirective<HTMLInputElement> = {
   // #4096 array checkboxes need to be deep traversed
   deep: true,
   beforeMount(el, binding) {
-    const { instance } = binding
-    assignFnMap.set(el, getModelAssigner(el, binding.instance))
+    assignFnMap.set(el, getModelAssigner(el))
 
     addEventListener(el, 'change', () => {
       const modelValue = binding.value
-      const elementValue = getValue(el, instance)
+      const elementValue = getValue(el)
       const checked = el.checked
       const assigner = assignFnMap.get(el)!
       if (isArray(modelValue)) {
@@ -275,14 +266,14 @@ export const vModelCheckbox: ObjectDirective<HTMLInputElement> = {
         }
         assigner(cloned)
       } else {
-        assigner(getCheckboxValue(el, instance, checked))
+        assigner(getCheckboxValue(el, checked))
       }
     })
   },
   // set initial checked on mount to wait for true-value/false-value
   mounted: setChecked,
   beforeUpdate(el, binding) {
-    assignFnMap.set(el, getModelAssigner(el, binding.instance))
+    assignFnMap.set(el, getModelAssigner(el))
     setChecked(el, binding)
   },
 }

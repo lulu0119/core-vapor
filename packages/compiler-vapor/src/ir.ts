@@ -15,9 +15,7 @@ import type {
 
 export enum IRNodeTypes {
   ROOT,
-  BLOCK_FUNCTION,
-
-  TEMPLATE_FACTORY,
+  BLOCK,
 
   SET_PROP,
   SET_DYNAMIC_PROPS,
@@ -29,7 +27,6 @@ export enum IRNodeTypes {
 
   INSERT_NODE,
   PREPEND_NODE,
-  APPEND_NODE,
   CREATE_TEXT_NODE,
 
   WITH_DIRECTIVE,
@@ -44,44 +41,40 @@ export interface BaseIRNode {
 
 export type VaporHelper = keyof typeof import('@vue/runtime-vapor')
 
-export interface BlockFunctionIRNode extends BaseIRNode {
-  type: IRNodeTypes.BLOCK_FUNCTION
+export interface BlockIRNode extends BaseIRNode {
+  type: IRNodeTypes.BLOCK
   node: RootNode | TemplateChildNode
-  templateIndex: number
   dynamic: IRDynamicInfo
   effect: IREffect[]
   operation: OperationNode[]
-  returns?: number[]
+  returns: number[]
 }
 
-export interface RootIRNode extends Omit<BlockFunctionIRNode, 'type'> {
+export interface RootIRNode {
   type: IRNodeTypes.ROOT
   node: RootNode
   source: string
-  template: Array<TemplateFactoryIRNode>
+  template: string[]
+  block: BlockIRNode
 }
 
 export interface IfIRNode extends BaseIRNode {
   type: IRNodeTypes.IF
   id: number
-  condition: IRExpression
-  positive: BlockFunctionIRNode
-  negative?: BlockFunctionIRNode | IfIRNode
+  condition: SimpleExpressionNode
+  positive: BlockIRNode
+  negative?: BlockIRNode | IfIRNode
 }
 
 export interface ForIRNode extends BaseIRNode {
   type: IRNodeTypes.FOR
   id: number
-  source: IRExpression
+  source: SimpleExpressionNode
   value?: SimpleExpressionNode
   key?: SimpleExpressionNode
   index?: SimpleExpressionNode
-  render: BlockFunctionIRNode
-}
-
-export interface TemplateFactoryIRNode extends BaseIRNode {
-  type: IRNodeTypes.TEMPLATE_FACTORY
-  template: string
+  keyProp?: SimpleExpressionNode
+  render: BlockIRNode
 }
 
 export interface IRProp extends Omit<DirectiveTransformResult, 'value'> {
@@ -111,7 +104,7 @@ export type KeyOverride = [find: string, replacement: string]
 export interface SetEventIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_EVENT
   element: number
-  key: IRExpression
+  key: SimpleExpressionNode
   value?: SimpleExpressionNode
   modifiers: {
     // modifiers for addEventListener() options, e.g. .passive & .capture
@@ -122,25 +115,26 @@ export interface SetEventIRNode extends BaseIRNode {
     nonKeys: string[]
   }
   keyOverride?: KeyOverride
+  delegate: boolean
 }
 
 export interface SetHtmlIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_HTML
   element: number
-  value: IRExpression
+  value: SimpleExpressionNode
 }
 
 export interface SetRefIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_REF
   element: number
-  value: IRExpression
+  value: SimpleExpressionNode
 }
 
 export interface SetModelValueIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_MODEL_VALUE
   element: number
-  key: IRExpression
-  value: IRExpression
+  key: SimpleExpressionNode
+  value: SimpleExpressionNode
   bindingType?: BindingTypes
   isComponent: boolean
 }
@@ -152,19 +146,13 @@ export interface CreateTextNodeIRNode extends BaseIRNode {
 
 export interface InsertNodeIRNode extends BaseIRNode {
   type: IRNodeTypes.INSERT_NODE
-  element: number | number[]
+  elements: number[]
   parent: number
-  anchor: number
+  anchor?: number
 }
 
 export interface PrependNodeIRNode extends BaseIRNode {
   type: IRNodeTypes.PREPEND_NODE
-  elements: number[]
-  parent: number
-}
-
-export interface AppendNodeIRNode extends BaseIRNode {
-  type: IRNodeTypes.APPEND_NODE
   elements: number[]
   parent: number
 }
@@ -176,7 +164,7 @@ export interface WithDirectiveIRNode extends BaseIRNode {
   builtin?: VaporHelper
 }
 
-export type IRNode = OperationNode | RootIRNode | TemplateFactoryIRNode
+export type IRNode = OperationNode | RootIRNode
 export type OperationNode =
   | SetPropIRNode
   | SetDynamicPropsIRNode
@@ -188,12 +176,9 @@ export type OperationNode =
   | CreateTextNodeIRNode
   | InsertNodeIRNode
   | PrependNodeIRNode
-  | AppendNodeIRNode
   | WithDirectiveIRNode
   | IfIRNode
   | ForIRNode
-
-export type BlockIRNode = RootIRNode | BlockFunctionIRNode
 
 export enum DynamicFlag {
   NONE = 0,
@@ -212,15 +197,15 @@ export enum DynamicFlag {
 }
 
 export interface IRDynamicInfo {
-  id: number | null
+  id?: number
   flags: DynamicFlag
-  anchor: number | null
+  anchor?: number
   children: IRDynamicInfo[]
+  template?: number
 }
 
-export type IRExpression = SimpleExpressionNode | string
 export interface IREffect {
-  expressions: IRExpression[]
+  expressions: SimpleExpressionNode[]
   operations: OperationNode[]
 }
 

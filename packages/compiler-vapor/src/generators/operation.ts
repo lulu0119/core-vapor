@@ -1,13 +1,6 @@
 import { type IREffect, IRNodeTypes, type OperationNode } from '../ir'
-import {
-  type CodeFragment,
-  type CodegenContext,
-  INDENT_END,
-  INDENT_START,
-  NEWLINE,
-  buildCodeFragment,
-} from '../generate'
-import { genAppendNode, genInsertNode, genPrependNode } from './dom'
+import type { CodegenContext } from '../generate'
+import { genInsertNode, genPrependNode } from './dom'
 import { genSetEvent } from './event'
 import { genFor } from './for'
 import { genSetHtml } from './html'
@@ -16,6 +9,13 @@ import { genSetModelValue } from './modelValue'
 import { genDynamicProps, genSetProp } from './prop'
 import { genSetRef } from './ref'
 import { genCreateTextNode, genSetText } from './text'
+import {
+  type CodeFragment,
+  INDENT_END,
+  INDENT_START,
+  NEWLINE,
+  buildCodeFragment,
+} from './utils'
 
 export function genOperations(opers: OperationNode[], context: CodegenContext) {
   const [frag, push] = buildCodeFragment()
@@ -50,8 +50,6 @@ export function genOperation(
       return genInsertNode(oper, context)
     case IRNodeTypes.PREPEND_NODE:
       return genPrependNode(oper, context)
-    case IRNodeTypes.APPEND_NODE:
-      return genAppendNode(oper, context)
     case IRNodeTypes.IF:
       return genIf(oper, context)
     case IRNodeTypes.FOR:
@@ -76,14 +74,14 @@ export function genEffect({ operations }: IREffect, context: CodegenContext) {
     `${vaporHelper('renderEffect')}(() => `,
   )
 
-  const [fragOps, pushOps] = buildCodeFragment()
+  const [operationsExps, pushOps] = buildCodeFragment()
   operations.forEach(op => pushOps(...genOperation(op, context)))
 
-  const newlineCount = fragOps.filter(frag => frag === NEWLINE).length
+  const newlineCount = operationsExps.filter(frag => frag === NEWLINE).length
   if (newlineCount > 1) {
-    push('{', INDENT_START, ...fragOps, INDENT_END, '})')
+    push('{', INDENT_START, ...operationsExps, INDENT_END, NEWLINE, '})')
   } else {
-    push(...fragOps.filter(frag => frag !== NEWLINE), ')')
+    push(...operationsExps.filter(frag => frag !== NEWLINE), ')')
   }
 
   return frag

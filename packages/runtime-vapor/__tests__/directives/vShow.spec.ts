@@ -1,7 +1,7 @@
-import { children, on, template, vShow, withDirectives } from '../src'
+import { children, on, template, vShow, withDirectives } from '../../src'
 import { nextTick, ref } from 'vue'
 import { describe, expect, test } from 'vitest'
-import { makeRender } from './_utils'
+import { makeRender } from '../_utils'
 
 const define = makeRender()
 
@@ -11,12 +11,12 @@ const createDemo = (defaultValue: boolean) =>
     function handleClick() {
       visible.value = !visible.value
     }
-    const t0 = template('<button>toggle</button><h1>hello world</h1>')
+    const t0 = template(
+      '<div><button>toggle</button><h1>hello world</h1></div>',
+    )
     const n0 = t0()
-    const {
-      0: [n1],
-      1: [n2],
-    } = children(n0)
+    const n1 = children(n0, 0)
+    const n2 = children(n0, 1)
     withDirectives(n2, [[vShow, () => visible.value]])
     on(n1 as HTMLElement, 'click', () => handleClick)
     return n0
@@ -25,11 +25,13 @@ describe('directive: v-show', () => {
   test('basic', async () => {
     const { host } = createDemo(true).render()
     const btn = host.querySelector('button')
-    expect(host.innerHTML).toBe('<button>toggle</button><h1>hello world</h1>')
+    expect(host.innerHTML).toBe(
+      '<div><button>toggle</button><h1>hello world</h1></div>',
+    )
     btn?.click()
     await nextTick()
     expect(host.innerHTML).toBe(
-      '<button>toggle</button><h1 style="display: none;">hello world</h1>',
+      '<div><button>toggle</button><h1 style="display: none;">hello world</h1></div>',
     )
   })
   test('should hide content when default value is false', async () => {

@@ -1,50 +1,32 @@
-import { type CodeFragment, type CodegenContext, NEWLINE } from '../generate'
-import type {
-  AppendNodeIRNode,
-  InsertNodeIRNode,
-  PrependNodeIRNode,
-} from '../ir'
+import type { CodegenContext } from '../generate'
+import type { InsertNodeIRNode, PrependNodeIRNode } from '../ir'
+import { type CodeFragment, NEWLINE, genCall } from './utils'
 
 export function genInsertNode(
-  oper: InsertNodeIRNode,
-  { call, vaporHelper }: CodegenContext,
+  { parent, elements, anchor }: InsertNodeIRNode,
+  { vaporHelper }: CodegenContext,
 ): CodeFragment[] {
-  const elements = ([] as number[]).concat(oper.element)
   let element = elements.map(el => `n${el}`).join(', ')
   if (elements.length > 1) element = `[${element}]`
   return [
     NEWLINE,
-    ...call(
+    ...genCall(
       vaporHelper('insert'),
       element,
-      `n${oper.parent}`,
-      `n${oper.anchor}`,
+      `n${parent}`,
+      anchor === undefined ? undefined : `n${anchor}`,
     ),
   ]
 }
 
 export function genPrependNode(
   oper: PrependNodeIRNode,
-  { call, vaporHelper }: CodegenContext,
+  { vaporHelper }: CodegenContext,
 ): CodeFragment[] {
   return [
     NEWLINE,
-    ...call(
+    ...genCall(
       vaporHelper('prepend'),
-      `n${oper.parent}`,
-      ...oper.elements.map(el => `n${el}`),
-    ),
-  ]
-}
-
-export function genAppendNode(
-  oper: AppendNodeIRNode,
-  { call, vaporHelper }: CodegenContext,
-): CodeFragment[] {
-  return [
-    NEWLINE,
-    ...call(
-      vaporHelper('append'),
       `n${oper.parent}`,
       ...oper.elements.map(el => `n${el}`),
     ),

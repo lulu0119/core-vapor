@@ -2,7 +2,7 @@ import { EffectScope } from '@vue/reactivity'
 
 import { EMPTY_OBJ } from '@vue/shared'
 import type { Block } from './render'
-import type { DirectiveBinding } from './directive'
+import type { DirectiveBinding } from './directives'
 import {
   type ComponentPropsOptions,
   type NormalizedPropsOptions,
@@ -21,24 +21,18 @@ import { VaporLifecycleHooks } from './enums'
 
 export type Component = FunctionalComponent | ObjectComponent
 
-export type SetupFn = (props: any, ctx: any) => Block | Data
-export type FunctionalComponent = SetupFn & {
-  props: ComponentPropsOptions
-  emits: EmitsOptions
-  render(ctx: any): Block
-}
+export type SetupFn = (props: any, ctx: any) => Block | Data | void
+export type FunctionalComponent = SetupFn & Omit<ObjectComponent, 'setup'>
+
 export interface ObjectComponent {
-  props: ComponentPropsOptions
-  emits: EmitsOptions
+  props?: ComponentPropsOptions
+  emits?: EmitsOptions
   setup?: SetupFn
-  render(ctx: any): Block
+  render?(ctx: any): Block
+  vapor?: boolean
 }
 
 type LifecycleHook<TFn = Function> = TFn[] | null
-
-export interface ElementMetadata {
-  props: Data
-}
 
 export interface ComponentInternalInstance {
   uid: number
@@ -58,11 +52,11 @@ export interface ComponentInternalInstance {
 
   // state
   props: Data
+  attrs: Data
   setupState: Data
   emit: EmitFn
   emitted: Record<string, boolean> | null
   refs: Data
-  metadata: WeakMap<Node, ElementMetadata>
 
   vapor: true
 
@@ -179,9 +173,9 @@ export const createComponentInstance = (
 
     // state
     props: EMPTY_OBJ,
+    attrs: EMPTY_OBJ,
     setupState: EMPTY_OBJ,
     refs: EMPTY_OBJ,
-    metadata: new WeakMap(),
     vapor: true,
 
     dirs: new Map(),

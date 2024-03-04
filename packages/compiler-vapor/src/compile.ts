@@ -13,6 +13,7 @@ import {
   transform,
 } from './transform'
 import { type VaporCodegenResult, generate } from './generate'
+import { transformChildren } from './transforms/transformChildren'
 import { transformOnce } from './transforms/vOnce'
 import { transformElement } from './transforms/transformElement'
 import { transformVHtml } from './transforms/vHtml'
@@ -26,8 +27,9 @@ import type { HackOptions } from './ir'
 import { transformVModel } from './transforms/vModel'
 import { transformVIf } from './transforms/vIf'
 import { transformVFor } from './transforms/vFor'
+import { transformComment } from './transforms/transformComment'
 
-export type CompilerOptions = HackOptions<BaseCompilerOptions>
+export { wrapTemplate } from './transforms/utils'
 
 // TODO: copied from @vue/compiler-core
 // code/AST -> IR -> JS codegen
@@ -49,10 +51,9 @@ export function compile(
   const prefixIdentifiers =
     !__BROWSER__ && (options.prefixIdentifiers === true || isModuleMode)
 
-  // TODO scope id
-  // if (options.scopeId && !isModuleMode) {
-  //   onError(createCompilerError(ErrorCodes.X_SCOPE_ID_NOT_SUPPORTED))
-  // }
+  if (options.scopeId && !isModuleMode) {
+    onError(createCompilerError(ErrorCodes.X_SCOPE_ID_NOT_SUPPORTED))
+  }
 
   const resolvedOptions = extend({}, options, {
     prefixIdentifiers,
@@ -89,6 +90,7 @@ export function compile(
   return generate(ir, resolvedOptions)
 }
 
+export type CompilerOptions = HackOptions<BaseCompilerOptions>
 export type TransformPreset = [
   NodeTransform[],
   Record<string, DirectiveTransform>,
@@ -105,6 +107,8 @@ export function getBaseTransformPreset(
       transformVFor,
       transformText,
       transformElement,
+      transformComment,
+      transformChildren,
     ],
     {
       bind: transformVBind,

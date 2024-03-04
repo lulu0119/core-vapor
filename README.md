@@ -42,8 +42,7 @@ PR are welcome!
     - [x] modifiers
   - [x] runtime directives
   - [ ] `v-memo` [on hold]
-  - [ ] `v-model`
-    - [x] text field
+  - [x] `v-model`
   - [x] `v-if` / `v-else` / `v-else-if`
   - [ ] `v-for`
     - [x] basic
@@ -54,6 +53,7 @@ PR are welcome!
   - [x] CodegenContext
   - [x] indent
   - [x] Source map
+  - [x] scope id
   - [ ] Function mode
   - [ ] SSR
 - [ ] Built-in Components

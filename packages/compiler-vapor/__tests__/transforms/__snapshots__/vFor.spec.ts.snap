@@ -1,43 +1,41 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`compiler: v-for > basic v-for 1`] = `
-"import { children as _children, on as _on, renderEffect as _renderEffect, setText as _setText, createFor as _createFor, template as _template } from 'vue/vapor';
+"import { delegate as _delegate, setText as _setText, renderEffect as _renderEffect, createFor as _createFor, delegateEvents as _delegateEvents, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
+_delegateEvents("click")
 
 export function render(_ctx) {
-  const n1 = _createFor(() => (_ctx.items), (_block) => {
+  const n0 = _createFor(() => (_ctx.items), (_block) => {
     const n2 = t0()
-    const { 0: [n3],} = _children(n2)
-    _on(n3, "click", () => $event => (_ctx.remove(_block.s[0])))
-    _renderEffect(() => {
+    _delegate(n2, "click", () => $event => (_ctx.remove(_block.s[0])))
+    const _updateEffect = () => {
       const [item] = _block.s
-      _setText(n3, item)
-    })
-    return n2
-  })
-  return [n1]
+      _setText(n2, item)
+    }
+    _renderEffect(_updateEffect)
+    return [n2, _updateEffect]
+  }, (item) => (item.id))
+  return n0
 }"
 `;
 
 exports[`compiler: v-for > multi effect 1`] = `
-"import { children as _children, renderEffect as _renderEffect, setDynamicProp as _setDynamicProp, createFor as _createFor, template as _template } from 'vue/vapor';
+"import { setDynamicProp as _setDynamicProp, renderEffect as _renderEffect, createFor as _createFor, template as _template } from 'vue/vapor';
 const t0 = _template("<div></div>")
 
 export function render(_ctx) {
-  const n1 = _createFor(() => (_ctx.items), (_block) => {
+  const n0 = _createFor(() => (_ctx.items), (_block) => {
     const n2 = t0()
-    const { 0: [n3],} = _children(n2)
-    _renderEffect(() => {
+    const _updateEffect = () => {
       const [item, index] = _block.s
-      _setDynamicProp(n3, "item", item)
-    })
-    _renderEffect(() => {
-      const [item, index] = _block.s
-      _setDynamicProp(n3, "index", index)
-    })
-    return n2
+      _setDynamicProp(n2, "item", item)
+      _setDynamicProp(n2, "index", index)
+    }
+    _renderEffect(_updateEffect)
+    return [n2, _updateEffect]
   })
-  return [n1]
+  return n0
 }"
 `;
 
@@ -46,10 +44,10 @@ exports[`compiler: v-for > w/o value 1`] = `
 const t0 = _template("<div>item</div>")
 
 export function render(_ctx) {
-  const n1 = _createFor(() => (_ctx.items), (_block) => {
+  const n0 = _createFor(() => (_ctx.items), (_block) => {
     const n2 = t0()
-    return n2
+    return [n2, () => {}]
   })
-  return [n1]
+  return n0
 }"
 `;

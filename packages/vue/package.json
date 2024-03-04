@@ -1,6 +1,6 @@
 {
   "name": "vue",
-  "version": "3.4.15",
+  "version": "3.4.21",
   "description": "The progressive JavaScript framework for building modern web UI.",
   "main": "index.js",
   "module": "dist/vue.runtime.esm-bundler.js",
@@ -13,6 +13,7 @@
     "dist",
     "compiler-sfc",
     "server-renderer",
+    "vapor",
     "jsx-runtime",
     "jsx.d.ts"
   ],

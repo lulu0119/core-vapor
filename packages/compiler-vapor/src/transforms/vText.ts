@@ -1,17 +1,15 @@
-import {
-  DOMErrorCodes,
-  createDOMCompilerError,
-  createSimpleExpression,
-} from '@vue/compiler-dom'
-import type { DirectiveTransform } from '../transform'
+import { DOMErrorCodes, createDOMCompilerError } from '@vue/compiler-dom'
 import { IRNodeTypes } from '../ir'
+import { EMPTY_EXPRESSION } from './utils'
+import type { DirectiveTransform } from '../transform'
 
 export const transformVText: DirectiveTransform = (dir, node, context) => {
-  const { exp, loc } = dir
+  let { exp, loc } = dir
   if (!exp) {
     context.options.onError(
       createDOMCompilerError(DOMErrorCodes.X_V_TEXT_NO_EXPRESSION, loc),
     )
+    exp = EMPTY_EXPRESSION
   }
   if (node.children.length) {
     context.options.onError(
@@ -26,7 +24,7 @@ export const transformVText: DirectiveTransform = (dir, node, context) => {
       {
         type: IRNodeTypes.SET_TEXT,
         element: context.reference(),
-        values: [exp || createSimpleExpression('', true)],
+        values: [exp],
       },
     ],
   )

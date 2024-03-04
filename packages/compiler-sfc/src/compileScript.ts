@@ -124,6 +124,10 @@ export interface SFCScriptCompileOptions {
    * Transform Vue SFCs into custom elements.
    */
   customElement?: boolean | ((filename: string) => boolean)
+  /**
+   * Force to use of Vapor mode.
+   */
+  vapor?: boolean
 }
 
 export interface ImportBinding {
@@ -158,6 +162,7 @@ export function compileScript(
   const scopeId = options.id ? options.id.replace(/^data-v-/, '') : ''
   const scriptLang = script && script.lang
   const scriptSetupLang = scriptSetup && scriptSetup.lang
+  const vapor = sfc.vapor || options.vapor
 
   let refBindings: string[] | undefined
 
@@ -920,6 +925,9 @@ export function compileScript(
     : `export default`
 
   let runtimeOptions = ``
+  if (vapor) {
+    runtimeOptions += `\n  vapor: true,`
+  }
   if (!ctx.hasDefaultExportName && filename && filename !== DEFAULT_FILENAME) {
     const match = filename.match(/([^/\\]+)\.\w+$/)
     if (match) {
@@ -961,6 +969,7 @@ export function compileScript(
       startOffset,
       `\n${genDefaultAs} /*#__PURE__*/${ctx.helper(
         `defineComponent`,
+        vapor,
       )}({${def}${runtimeOptions}\n  ${
         hasAwait ? `async ` : ``
       }setup(${args}) {\n${exposeCall}`,
@@ -994,6 +1003,13 @@ export function compileScript(
       `import { ${[...ctx.helperImports]
         .map(h => `${h} as _${h}`)
         .join(', ')} } from 'vue'\n`,
+    )
+  }
+  if (ctx.vaporHelperImports.size > 0) {
+    ctx.s.prepend(
+      `import { ${[...ctx.vaporHelperImports]
+        .map(h => `${h} as _${h}`)
+        .join(', ')} } from 'vue/vapor'\n`,
     )
   }
 

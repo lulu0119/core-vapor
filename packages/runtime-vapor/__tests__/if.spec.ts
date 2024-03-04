@@ -1,6 +1,4 @@
 import {
-  append,
-  children,
   createIf,
   insert,
   nextTick,
@@ -33,9 +31,6 @@ describe('createIf', () => {
 
     const { host } = define(() => {
       const n0 = t0()
-      const {
-        0: [n1],
-      } = children(n0)
 
       insert(
         createIf(
@@ -43,11 +38,8 @@ describe('createIf', () => {
           // v-if
           (spyIfFn ||= vi.fn(() => {
             const n2 = t1()
-            const {
-              0: [n3],
-            } = children(n2)
             renderEffect(() => {
-              setText(n3, count.value)
+              setText(n2, count.value)
             })
             return n2
           })),
@@ -57,7 +49,7 @@ describe('createIf', () => {
             return n4
           })),
         ),
-        n1 as any as ParentNode,
+        n0 as any as ParentNode,
       )
       return n0
     }).render()
@@ -108,11 +100,10 @@ describe('createIf', () => {
               return n4
             },
           )
-          append(n2, n3)
-          return n2
+          return [n2, n3]
         },
       )
-      return [n1]
+      return n1
     }).render()
 
     expect(host.innerHTML).toBe('Hello Vapor<!--if--><!--if-->')

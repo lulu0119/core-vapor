@@ -26,14 +26,14 @@ describe('compiler: v-once', () => {
 
     expect(code).toMatchSnapshot()
     expect(helpers).lengthOf(0)
-    expect(ir.effect).lengthOf(0)
-    expect(ir.operation).toMatchObject([
+    expect(ir.block.effect).lengthOf(0)
+    expect(ir.block.operation).toMatchObject([
       {
         type: IRNodeTypes.CREATE_TEXT_NODE,
-        id: 1,
+        id: 0,
       },
       {
-        element: 1,
+        element: 0,
         type: IRNodeTypes.SET_TEXT,
         values: [
           {
@@ -49,7 +49,7 @@ describe('compiler: v-once', () => {
         ],
       },
       {
-        element: 2,
+        element: 1,
         type: IRNodeTypes.SET_PROP,
         prop: {
           key: {
@@ -68,8 +68,8 @@ describe('compiler: v-once', () => {
       },
       {
         type: IRNodeTypes.PREPEND_NODE,
-        elements: [1],
-        parent: 3,
+        elements: [0],
+        parent: 2,
       },
     ])
   })
@@ -79,11 +79,11 @@ describe('compiler: v-once', () => {
 
     expect(code).toMatchSnapshot()
     expect(helpers).lengthOf(0)
-    expect(ir.effect).lengthOf(0)
-    expect(ir.operation).toMatchObject([
+    expect(ir.block.effect).lengthOf(0)
+    expect(ir.block.operation).toMatchObject([
       {
         type: IRNodeTypes.SET_PROP,
-        element: 1,
+        element: 0,
         prop: {
           key: {
             type: NodeTypes.SIMPLE_EXPRESSION,
@@ -110,11 +110,11 @@ describe('compiler: v-once', () => {
 
     expect(code).toMatchSnapshot()
     expect(helpers).lengthOf(0)
-    expect(ir.effect).lengthOf(0)
-    expect(ir.operation).toMatchObject([
+    expect(ir.block.effect).lengthOf(0)
+    expect(ir.block.operation).toMatchObject([
       {
         type: IRNodeTypes.SET_PROP,
-        element: 1,
+        element: 0,
         prop: {
           runtimeCamelize: false,
           key: {
@@ -144,8 +144,8 @@ describe('compiler: v-once', () => {
 
     expect(code).toMatchSnapshot()
     expect(helpers).lengthOf(0)
-    expect(ir.effect).lengthOf(0)
-    expect(ir.operation).lengthOf(0)
+    expect(ir.block.effect).lengthOf(0)
+    expect(ir.block.operation).lengthOf(0)
   })
 
   test.todo('with hoistStatic: true')
