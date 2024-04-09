@@ -1,7 +1,6 @@
-import { EffectScope, isRef } from '@vue/reactivity'
+import { isRef } from '@vue/reactivity'
 import { EMPTY_OBJ, hasOwn, isArray, isFunction } from '@vue/shared'
 import type { Block } from './apiRender'
-import type { DirectiveBinding } from './directives'
 import {
   type ComponentPropsOptions,
   type NormalizedPropsOptions,
@@ -27,6 +26,7 @@ import { VaporLifecycleHooks } from './apiLifecycle'
 import { warn } from './warning'
 import { type AppContext, createAppContext } from './apiCreateVaporApp'
 import type { Data } from '@vue/shared'
+import { RenderEffectScope } from './renderEffectScope'
 
 export type Component = FunctionalComponent | ObjectComponent
 
@@ -120,10 +120,9 @@ export interface ComponentInternalInstance {
   parent: ComponentInternalInstance | null
 
   provides: Data
-  scope: EffectScope
+  scope: RenderEffectScope
   component: FunctionalComponent | ObjectComponent
   comps: Set<ComponentInternalInstance>
-  dirs: Map<Node, DirectiveBinding[]>
 
   rawProps: NormalizedRawProps
   propsOptions: NormalizedPropsOptions
@@ -245,11 +244,10 @@ export function createComponentInstance(
 
     parent,
 
-    scope: new EffectScope(true /* detached */)!,
+    scope: null!,
     provides: parent ? parent.provides : Object.create(_appContext.provides),
     component,
     comps: new Set(),
-    dirs: new Map(),
 
     // resolved props and emits options
     rawProps: null!, // set later
@@ -320,6 +318,7 @@ export function createComponentInstance(
      */
     // [VaporLifecycleHooks.SERVER_PREFETCH]: null,
   }
+  instance.scope = new RenderEffectScope(instance, parent ? parent.scope : null)
   initProps(instance, rawProps, !isFunction(component))
   initSlots(instance, slots, dynamicSlots)
   instance.emit = emit.bind(null, instance)

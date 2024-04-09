@@ -1,7 +1,15 @@
-import { renderEffect } from './renderEffect'
 import { type Block, type Fragment, fragmentKey } from './apiRender'
-import { type EffectScope, effectScope } from '@vue/reactivity'
+import { getCurrentScope } from '@vue/reactivity'
 import { createComment, createTextNode, insert, remove } from './dom/element'
+import { currentInstance } from './component'
+import { warn } from './warning'
+import { RenderEffectScope, isRenderEffectScope } from './renderEffectScope'
+import {
+  createChildFragmentDirectives,
+  invokeWithMount,
+  invokeWithUnmount,
+  invokeWithUpdate,
+} from './directivesChildFragment'
 
 type BlockFn = () => Block
 
@@ -17,12 +25,18 @@ export const createIf = (
   let branch: BlockFn | undefined
   let parent: ParentNode | undefined | null
   let block: Block | undefined
-  let scope: EffectScope | undefined
+  let scope: RenderEffectScope | undefined
+  const parentScope = getCurrentScope()!
   const anchor = __DEV__ ? createComment('if') : createTextNode()
   const fragment: Fragment = {
     nodes: [],
     anchor,
     [fragmentKey]: true,
+  }
+
+  const instance = currentInstance!
+  if (__DEV__ && (!instance || !isRenderEffectScope(parentScope))) {
+    warn('createIf() can only be used inside setup()')
   }
 
   // TODO: SSR
@@ -31,23 +45,25 @@ export const createIf = (
   //   setCurrentHydrationNode(hydrationNode!)
   // }
 
-  renderEffect(() => {
-    if ((newValue = !!condition()) !== oldValue) {
-      parent ||= anchor.parentNode
-      if (block) {
-        scope!.stop()
-        remove(block, parent!)
+  createChildFragmentDirectives(
+    anchor,
+    () => (scope ? [scope] : []),
+    // source getter
+    condition,
+    // init cb
+    getValue => {
+      newValue = !!getValue()
+      doIf()
+    },
+    // effect cb
+    getValue => {
+      if ((newValue = !!getValue()) !== oldValue) {
+        doIf()
+      } else if (scope) {
+        invokeWithUpdate(scope)
       }
-      if ((branch = (oldValue = newValue) ? b1 : b2)) {
-        scope = effectScope()
-        fragment.nodes = block = scope.run(branch)!
-        parent && insert(block, parent, anchor)
-      } else {
-        scope = block = undefined
-        fragment.nodes = []
-      }
-    }
-  })
+    },
+  )
 
   // TODO: SSR
   // if (isHydrating) {
@@ -55,4 +71,19 @@ export const createIf = (
   // }
 
   return fragment
+
+  function doIf() {
+    parent ||= anchor.parentNode
+    if (block) {
+      invokeWithUnmount(scope!, () => remove(block!, parent!))
+    }
+    if ((branch = (oldValue = newValue) ? b1 : b2)) {
+      scope = new RenderEffectScope(instance, parentScope)
+      fragment.nodes = block = scope.run(branch)!
+      invokeWithMount(scope, () => parent && insert(block!, parent, anchor))
+    } else {
+      scope = block = undefined
+      fragment.nodes = []
+    }
+  }
 }
