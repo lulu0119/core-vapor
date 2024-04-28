@@ -1,8 +1,9 @@
 import type {
   CodegenOptions as BaseCodegenOptions,
   BaseCodegenResult,
+  CodegenSourceMapGenerator,
 } from '@vue/compiler-dom'
-import type { IREffect, RootIRNode, VaporHelper } from './ir'
+import type { BlockIRNode, IREffect, RootIRNode, VaporHelper } from './ir'
 import { SourceMapGenerator } from 'source-map-js'
 import { extend, remove } from '@vue/shared'
 import { genBlockContent } from './generators/block'
@@ -24,7 +25,7 @@ export class CodegenContext {
   options: Required<CodegenOptions>
 
   code: CodeFragment[]
-  map?: SourceMapGenerator
+  map?: CodegenSourceMapGenerator
   push: (...args: CodeFragment[]) => void
 
   helpers = new Set<string>([])
@@ -41,7 +42,13 @@ export class CodegenContext {
   delegates = new Set<string>()
 
   identifiers: Record<string, string[]> = Object.create(null)
-  withId = <T>(fn: () => T, map: Record<string, string | null>): T => {
+
+  block: BlockIRNode
+  genEffects: Array<
+    (effects: IREffect[], context: CodegenContext) => CodeFragment[]
+  > = []
+
+  withId<T>(fn: () => T, map: Record<string, string | null>): T {
     const { identifiers } = this
     const ids = Object.keys(map)
 
@@ -55,7 +62,12 @@ export class CodegenContext {
 
     return ret
   }
-  genEffect?: (effects: IREffect[]) => CodeFragment[]
+
+  enterBlock(block: BlockIRNode) {
+    const parent = this.block
+    this.block = block
+    return () => (this.block = parent)
+  }
 
   constructor(
     public ir: RootIRNode,
@@ -79,6 +91,7 @@ export class CodegenContext {
       expressionPlugins: [],
     }
     this.options = extend(defaultOptions, options)
+    this.block = ir.block
 
     const [code, push] = buildCodeFragment()
     this.code = code
@@ -89,7 +102,8 @@ export class CodegenContext {
     } = this
     if (!__BROWSER__ && sourceMap) {
       // lazy require source-map implementation, only in non-browser builds
-      this.map = new SourceMapGenerator()
+      this.map =
+        new SourceMapGenerator() as unknown as CodegenSourceMapGenerator
       this.map.setSourceContent(filename, ir.source)
       this.map._sources.add(filename)
     }
@@ -119,7 +133,7 @@ export function generate(
   }
 
   push(INDENT_START)
-  push(...genBlockContent(ir.block, context))
+  push(...genBlockContent(ir.block, context, true))
   push(INDENT_END, NEWLINE)
 
   if (isSetupInlined) {

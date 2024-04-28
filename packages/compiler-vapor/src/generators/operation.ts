@@ -1,13 +1,13 @@
 import { type IREffect, IRNodeTypes, type OperationNode } from '../ir'
 import type { CodegenContext } from '../generate'
 import { genInsertNode, genPrependNode } from './dom'
-import { genSetEvent } from './event'
+import { genSetDynamicEvents, genSetEvent } from './event'
 import { genFor } from './for'
 import { genSetHtml } from './html'
 import { genIf } from './if'
 import { genSetModelValue } from './modelValue'
 import { genDynamicProps, genSetProp } from './prop'
-import { genSetRef } from './ref'
+import { genSetTemplateRef } from './templateRef'
 import { genCreateTextNode, genSetText } from './text'
 import {
   type CodeFragment,
@@ -16,6 +16,7 @@ import {
   NEWLINE,
   buildCodeFragment,
 } from './utils'
+import { genCreateComponent } from './component'
 
 export function genOperations(opers: OperationNode[], context: CodegenContext) {
   const [frag, push] = buildCodeFragment()
@@ -38,10 +39,12 @@ export function genOperation(
       return genSetText(oper, context)
     case IRNodeTypes.SET_EVENT:
       return genSetEvent(oper, context)
+    case IRNodeTypes.SET_DYNAMIC_EVENTS:
+      return genSetDynamicEvents(oper, context)
     case IRNodeTypes.SET_HTML:
       return genSetHtml(oper, context)
-    case IRNodeTypes.SET_REF:
-      return genSetRef(oper, context)
+    case IRNodeTypes.SET_TEMPLATE_REF:
+      return genSetTemplateRef(oper, context)
     case IRNodeTypes.SET_MODEL_VALUE:
       return genSetModelValue(oper, context)
     case IRNodeTypes.CREATE_TEXT_NODE:
@@ -54,6 +57,8 @@ export function genOperation(
       return genIf(oper, context)
     case IRNodeTypes.FOR:
       return genFor(oper, context)
+    case IRNodeTypes.CREATE_COMPONENT_NODE:
+      return genCreateComponent(oper, context)
   }
 
   return []

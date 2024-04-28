@@ -11,7 +11,15 @@ import type {
   VaporHelper,
 } from '../ir'
 import { genExpression } from './expression'
-import { type CodeFragment, NEWLINE, genCall, genMulti } from './utils'
+import {
+  type CodeFragment,
+  NEWLINE,
+  SEGMENTS_ARRAY,
+  SEGMENTS_OBJECT,
+  genCall,
+  genMulti,
+} from './utils'
+import { toHandlerKey } from '@vue/shared'
 
 // only the static key prop will reach here
 export function genSetProp(
@@ -65,7 +73,7 @@ export function genDynamicProps(
         props =>
           Array.isArray(props)
             ? genLiteralObjectProps(props, context) // static and dynamic arg props
-            : genExpression(props, context), // v-bind="{}"
+            : genExpression(props.value, context), // v-bind=""
       ),
     ),
   ]
@@ -76,17 +84,17 @@ function genLiteralObjectProps(
   context: CodegenContext,
 ): CodeFragment[] {
   return genMulti(
-    ['{ ', ' }', ', '],
+    SEGMENTS_OBJECT,
     ...props.map(prop => [
-      ...genPropertyKey(prop, context),
+      ...genPropKey(prop, context),
       `: `,
       ...genPropValue(prop.values, context),
     ]),
   )
 }
 
-function genPropertyKey(
-  { key: node, runtimeCamelize, modifier }: IRProp,
+export function genPropKey(
+  { key: node, modifier, runtimeCamelize, handler }: IRProp,
   context: CodegenContext,
 ): CodeFragment[] {
   const { helper } = context
@@ -94,7 +102,7 @@ function genPropertyKey(
   // static arg was transformed by v-bind transformer
   if (node.isStatic) {
     // only quote keys if necessary
-    const keyName = node.content
+    const keyName = handler ? toHandlerKey(node.content) : node.content
     return [
       [
         isSimpleIdentifier(keyName) ? keyName : JSON.stringify(keyName),
@@ -104,13 +112,14 @@ function genPropertyKey(
     ]
   }
 
-  const key = genExpression(node, context)
-  return [
-    '[',
-    modifier && `${JSON.stringify(modifier)} + `,
-    ...(runtimeCamelize ? genCall(helper('camelize'), key) : key),
-    ']',
-  ]
+  let key = genExpression(node, context)
+  if (runtimeCamelize) {
+    key = genCall(helper('camelize'), key)
+  }
+  if (handler) {
+    key = genCall(helper('toHandlerKey'), key)
+  }
+  return ['[', modifier && `${JSON.stringify(modifier)} + `, ...key, ']']
 }
 
 function genPropValue(values: SimpleExpressionNode[], context: CodegenContext) {
@@ -118,7 +127,7 @@ function genPropValue(values: SimpleExpressionNode[], context: CodegenContext) {
     return genExpression(values[0], context)
   }
   return genMulti(
-    ['[', ']', ', '],
+    SEGMENTS_ARRAY,
     ...values.map(expr => genExpression(expr, context)),
   )
 }

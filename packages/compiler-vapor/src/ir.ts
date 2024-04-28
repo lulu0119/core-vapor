@@ -21,13 +21,15 @@ export enum IRNodeTypes {
   SET_DYNAMIC_PROPS,
   SET_TEXT,
   SET_EVENT,
+  SET_DYNAMIC_EVENTS,
   SET_HTML,
-  SET_REF,
+  SET_TEMPLATE_REF,
   SET_MODEL_VALUE,
 
   INSERT_NODE,
   PREPEND_NODE,
   CREATE_TEXT_NODE,
+  CREATE_COMPONENT_NODE,
 
   WITH_DIRECTIVE,
 
@@ -55,6 +57,7 @@ export interface RootIRNode {
   node: RootNode
   source: string
   template: string[]
+  component: Set<string>
   block: BlockIRNode
 }
 
@@ -80,7 +83,12 @@ export interface ForIRNode extends BaseIRNode {
 export interface IRProp extends Omit<DirectiveTransformResult, 'value'> {
   values: SimpleExpressionNode[]
 }
-export type IRProps = IRProp[] | SimpleExpressionNode
+export type IRProps =
+  | IRProp[]
+  | {
+      value: SimpleExpressionNode
+      handler?: boolean
+    }
 
 export interface SetPropIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_PROP
@@ -92,6 +100,12 @@ export interface SetDynamicPropsIRNode extends BaseIRNode {
   type: IRNodeTypes.SET_DYNAMIC_PROPS
   element: number
   props: IRProps[]
+}
+
+export interface SetDynamicEventsIRNode extends BaseIRNode {
+  type: IRNodeTypes.SET_DYNAMIC_EVENTS
+  element: number
+  event: SimpleExpressionNode
 }
 
 export interface SetTextIRNode extends BaseIRNode {
@@ -116,6 +130,8 @@ export interface SetEventIRNode extends BaseIRNode {
   }
   keyOverride?: KeyOverride
   delegate: boolean
+  /** Whether it's in effect */
+  effect: boolean
 }
 
 export interface SetHtmlIRNode extends BaseIRNode {
@@ -124,10 +140,11 @@ export interface SetHtmlIRNode extends BaseIRNode {
   value: SimpleExpressionNode
 }
 
-export interface SetRefIRNode extends BaseIRNode {
-  type: IRNodeTypes.SET_REF
+export interface SetTemplateRefIRNode extends BaseIRNode {
+  type: IRNodeTypes.SET_TEMPLATE_REF
   element: number
   value: SimpleExpressionNode
+  refFor: boolean
 }
 
 export interface SetModelValueIRNode extends BaseIRNode {
@@ -142,6 +159,8 @@ export interface SetModelValueIRNode extends BaseIRNode {
 export interface CreateTextNodeIRNode extends BaseIRNode {
   type: IRNodeTypes.CREATE_TEXT_NODE
   id: number
+  values: SimpleExpressionNode[]
+  effect: boolean
 }
 
 export interface InsertNodeIRNode extends BaseIRNode {
@@ -164,14 +183,26 @@ export interface WithDirectiveIRNode extends BaseIRNode {
   builtin?: VaporHelper
 }
 
+export interface CreateComponentIRNode extends BaseIRNode {
+  type: IRNodeTypes.CREATE_COMPONENT_NODE
+  id: number
+  tag: string
+  props: IRProps[]
+  // TODO slots
+
+  resolve: boolean
+  root: boolean
+}
+
 export type IRNode = OperationNode | RootIRNode
 export type OperationNode =
   | SetPropIRNode
   | SetDynamicPropsIRNode
   | SetTextIRNode
   | SetEventIRNode
+  | SetDynamicEventsIRNode
   | SetHtmlIRNode
-  | SetRefIRNode
+  | SetTemplateRefIRNode
   | SetModelValueIRNode
   | CreateTextNodeIRNode
   | InsertNodeIRNode
@@ -179,6 +210,7 @@ export type OperationNode =
   | WithDirectiveIRNode
   | IfIRNode
   | ForIRNode
+  | CreateComponentIRNode
 
 export enum DynamicFlag {
   NONE = 0,

@@ -1,21 +1,23 @@
-import { type BlockIRNode, IRNodeTypes, type WithDirectiveIRNode } from '../ir'
+import type { BlockIRNode } from '../ir'
 import {
   type CodeFragment,
   INDENT_END,
   INDENT_START,
   NEWLINE,
+  SEGMENTS_ARRAY,
   buildCodeFragment,
+  genCall,
+  genMulti,
 } from './utils'
 import type { CodegenContext } from '../generate'
-import { genWithDirective } from './directive'
 import { genEffects, genOperations } from './operation'
 import { genChildren } from './template'
-import { genMulti } from './utils'
 
 export function genBlock(
   oper: BlockIRNode,
   context: CodegenContext,
   args: CodeFragment[] = [],
+  root?: boolean,
   customReturns?: (returns: CodeFragment[]) => CodeFragment[],
 ): CodeFragment[] {
   return [
@@ -23,7 +25,7 @@ export function genBlock(
     ...args,
     ') => {',
     INDENT_START,
-    ...genBlockContent(oper, context, customReturns),
+    ...genBlockContent(oper, context, root, customReturns),
     INDENT_END,
     NEWLINE,
     '}',
@@ -31,43 +33,46 @@ export function genBlock(
 }
 
 export function genBlockContent(
-  { dynamic, effect, operation, returns }: BlockIRNode,
+  block: BlockIRNode,
   context: CodegenContext,
+  root?: boolean,
   customReturns?: (returns: CodeFragment[]) => CodeFragment[],
 ): CodeFragment[] {
   const [frag, push] = buildCodeFragment()
+  const { dynamic, effect, operation, returns } = block
+  const resetBlock = context.enterBlock(block)
+
+  if (root)
+    for (const name of context.ir.component) {
+      push(
+        NEWLINE,
+        `const _component_${name} = `,
+        ...genCall(
+          context.vaporHelper('resolveComponent'),
+          JSON.stringify(name),
+        ),
+      )
+    }
 
   for (const child of dynamic.children) {
     push(...genChildren(child, context, child.id!))
   }
 
-  const directiveOps = operation.filter(
-    (oper): oper is WithDirectiveIRNode =>
-      oper.type === IRNodeTypes.WITH_DIRECTIVE,
-  )
-  for (const directives of groupDirective(directiveOps)) {
-    push(...genWithDirective(directives, context))
-  }
-
   push(...genOperations(operation, context))
-  push(...(context.genEffect || genEffects)(effect, context))
+  push(
+    ...(context.genEffects.length
+      ? context.genEffects[context.genEffects.length - 1]
+      : genEffects)(effect, context),
+  )
 
   push(NEWLINE, `return `)
 
   const returnsCode: CodeFragment[] =
     returns.length > 1
-      ? genMulti(['[', ']', ', '], ...returns.map(n => `n${n}`))
+      ? genMulti(SEGMENTS_ARRAY, ...returns.map(n => `n${n}`))
       : [`n${returns[0]}`]
   push(...(customReturns ? customReturns(returnsCode) : returnsCode))
 
+  resetBlock()
   return frag
-}
-
-function groupDirective(ops: WithDirectiveIRNode[]): WithDirectiveIRNode[][] {
-  const directiveMap: Record<number, WithDirectiveIRNode[]> = {}
-  for (const oper of ops) {
-    if (!directiveMap[oper.element]) directiveMap[oper.element] = []
-    directiveMap[oper.element].push(oper)
-  }
-  return Object.values(directiveMap)
 }

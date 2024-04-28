@@ -72,7 +72,6 @@ describe('compile', () => {
         expect(code).not.contains('effect')
       })
 
-      // TODO: support multiple root nodes and components
       test('should not affect siblings after it', () => {
         const code = compile(
           `<div v-pre :id="foo"><Comp/>{{ bar }}</div>\n` +
@@ -200,6 +199,17 @@ describe('compile', () => {
   describe('custom directive', () => {
     test('basic', () => {
       const code = compile(`<div v-test v-hello.world />`)
+      expect(code).matchSnapshot()
+    })
+
+    test('component', () => {
+      const code = compile(`
+      <Comp v-test>
+        <div v-if="true">
+          <Bar v-hello.world />
+        </div>
+      </Comp>
+      `)
       expect(code).matchSnapshot()
     })
   })

@@ -4,12 +4,30 @@ import {
   setCurrentInstance,
 } from './component'
 import { warn } from './warning'
-import { pauseTracking, resetTracking } from '@vue/reactivity'
+import {
+  type DebuggerEvent,
+  pauseTracking,
+  resetTracking,
+} from '@vue/reactivity'
 import { ErrorTypeStrings, callWithAsyncErrorHandling } from './errorHandling'
 import { toHandlerKey } from '@vue/shared'
-import { VaporLifecycleHooks } from './enums'
 
-export const injectHook = (
+export enum VaporLifecycleHooks {
+  BEFORE_MOUNT = 'bm',
+  MOUNTED = 'm',
+  BEFORE_UPDATE = 'bu',
+  UPDATED = 'u',
+  BEFORE_UNMOUNT = 'bum',
+  UNMOUNTED = 'um',
+  DEACTIVATED = 'da',
+  ACTIVATED = 'a',
+  RENDER_TRIGGERED = 'rtg',
+  RENDER_TRACKED = 'rtc',
+  ERROR_CAPTURED = 'ec',
+  // SERVER_PREFETCH = 'sp',
+}
+
+const injectHook = (
   type: VaporLifecycleHooks,
   hook: Function & { __weh?: Function },
   target: ComponentInternalInstance | null = currentInstance,
@@ -25,7 +43,9 @@ export const injectHook = (
         }
         pauseTracking()
         const reset = setCurrentInstance(target)
-        const res = callWithAsyncErrorHandling(hook, target, type, args)
+        const res = target.scope.run(() =>
+          callWithAsyncErrorHandling(hook, target, type, args),
+        )
         reset()
         resetTracking()
         return res
@@ -49,7 +69,7 @@ export const injectHook = (
     )
   }
 }
-export const createHook =
+const createHook =
   <T extends Function = () => any>(lifecycle: VaporLifecycleHooks) =>
   (hook: T, target: ComponentInternalInstance | null = currentInstance) =>
     injectHook(lifecycle, (...args: unknown[]) => hook(...args), target)
@@ -60,6 +80,14 @@ export const onBeforeUpdate = createHook(VaporLifecycleHooks.BEFORE_UPDATE)
 export const onUpdated = createHook(VaporLifecycleHooks.UPDATED)
 export const onBeforeUnmount = createHook(VaporLifecycleHooks.BEFORE_UNMOUNT)
 export const onUnmounted = createHook(VaporLifecycleHooks.UNMOUNTED)
+
+export type DebuggerHook = (e: DebuggerEvent) => void
+export const onRenderTriggered = createHook<DebuggerHook>(
+  VaporLifecycleHooks.RENDER_TRIGGERED,
+)
+export const onRenderTracked = createHook<DebuggerHook>(
+  VaporLifecycleHooks.RENDER_TRACKED,
+)
 
 export type ErrorCapturedHook<TError = unknown> = (
   err: TError,

@@ -11,6 +11,7 @@ import {
 } from '@vue/compiler-dom'
 import type { NodeTransform, TransformContext } from '../transform'
 import { DynamicFlag, IRNodeTypes } from '../ir'
+import { isConstantExpression } from '../utils'
 
 type TextLike = TextNode | InterpolationNode
 const seen = new WeakMap<
@@ -50,17 +51,13 @@ function processTextLike(context: TransformContext<InterpolationNode>) {
   const values = nodes.map(node => createTextLikeExpression(node, context))
 
   context.dynamic.flags |= DynamicFlag.INSERT | DynamicFlag.NON_TEMPLATE
+
   context.registerOperation({
     type: IRNodeTypes.CREATE_TEXT_NODE,
     id,
+    values,
+    effect: !values.some(isConstantExpression),
   })
-  context.registerEffect(values, [
-    {
-      type: IRNodeTypes.SET_TEXT,
-      element: id,
-      values,
-    },
-  ])
 }
 
 function processTextLikeContainer(
@@ -68,13 +65,11 @@ function processTextLikeContainer(
   context: TransformContext<ElementNode>,
 ) {
   const values = children.map(child => createTextLikeExpression(child, context))
-  context.registerEffect(values, [
-    {
-      type: IRNodeTypes.SET_TEXT,
-      element: context.reference(),
-      values,
-    },
-  ])
+  context.registerEffect(values, {
+    type: IRNodeTypes.SET_TEXT,
+    element: context.reference(),
+    values,
+  })
 }
 
 function createTextLikeExpression(node: TextLike, context: TransformContext) {

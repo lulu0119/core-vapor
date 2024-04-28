@@ -3,6 +3,7 @@
 export const version = __VERSION__
 export {
   // core
+  type Ref,
   reactive,
   ref,
   readonly,
@@ -29,14 +30,20 @@ export {
   // effect
   stop,
   ReactiveEffect,
-  getCurrentEffect,
   onEffectCleanup,
   // effect scope
   effectScope,
   EffectScope,
   getCurrentScope,
   onScopeDispose,
+  // baseWatch
+  onWatcherCleanup,
+  getCurrentWatcher,
 } from '@vue/reactivity'
+
+import { NOOP } from '@vue/shared'
+import { warn as _warn } from './warning'
+export const warn = (__DEV__ ? _warn : NOOP) as typeof _warn
 
 export { nextTick } from './scheduler'
 export {
@@ -47,8 +54,8 @@ export {
   type FunctionalComponent,
   type SetupFn,
 } from './component'
-export { render, unmountComponent } from './render'
-export { renderEffect, renderWatch } from './renderWatch'
+export { createSlot } from './componentSlots'
+export { renderEffect } from './renderEffect'
 export {
   watch,
   watchEffect,
@@ -63,7 +70,6 @@ export {
 } from './apiWatch'
 export {
   withDirectives,
-  resolveDirective,
   type Directive,
   type DirectiveBinding,
   type DirectiveHook,
@@ -85,10 +91,16 @@ export {
   setDynamicProp,
   setDynamicProps,
 } from './dom/prop'
-export { on, delegate, delegateEvents } from './dom/event'
+export { on, delegate, delegateEvents, setDynamicEvents } from './dom/event'
 export { setRef } from './dom/templateRef'
 
 export { defineComponent } from './apiDefineComponent'
+export {
+  type InjectionKey,
+  inject,
+  provide,
+  hasInjectionContext,
+} from './apiInject'
 export {
   onBeforeMount,
   onMounted,
@@ -98,13 +110,23 @@ export {
   onUnmounted,
   // onActivated,
   // onDeactivated,
-  // onRenderTracked,
-  // onRenderTriggered,
+  onRenderTracked,
+  onRenderTriggered,
   onErrorCaptured,
   // onServerPrefetch,
 } from './apiLifecycle'
-export { createIf } from './if'
-export { createFor } from './for'
+export { useAttrs, useSlots } from './apiSetupHelpers'
+export {
+  createVaporApp,
+  type App,
+  type AppConfig,
+  type AppContext,
+} from './apiCreateVaporApp'
+export { createIf } from './apiCreateIf'
+export { createFor } from './apiCreateFor'
+export { createComponent } from './apiCreateComponent'
+
+export { resolveComponent, resolveDirective } from './helpers/resolveAssets'
 
 // **Internal** DOM-only runtime directive helpers
 export {

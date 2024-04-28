@@ -14,9 +14,9 @@ import {
 } from '../vnode'
 import { warn } from '../warning'
 import { isKeepAlive } from './KeepAlive'
-import { toRaw } from '@vue/reactivity'
+import { SchedulerJobFlags, toRaw } from '@vue/reactivity'
 import { ErrorCodes, callWithAsyncErrorHandling } from '../errorHandling'
-import { PatchFlags, ShapeFlags, isArray } from '@vue/shared'
+import { PatchFlags, ShapeFlags, isArray, isFunction } from '@vue/shared'
 import { onBeforeUnmount, onMounted } from '../apiLifecycle'
 import type { RendererElement } from '../renderer'
 
@@ -231,8 +231,7 @@ const BaseTransitionImpl: ComponentOptions = {
             state.isLeaving = false
             // #6835
             // it also needs to be updated when active is undefined
-            if (instance.update.active !== false) {
-              instance.effect.dirty = true
+            if (!(instance.job.flags! & SchedulerJobFlags.DISPOSED)) {
               instance.update()
             }
           }
@@ -459,15 +458,29 @@ function emptyPlaceholder(vnode: VNode): VNode | undefined {
 }
 
 function getKeepAliveChild(vnode: VNode): VNode | undefined {
-  return isKeepAlive(vnode)
-    ? // #7121 ensure get the child component subtree in case
-      // it's been replaced during HMR
-      __DEV__ && vnode.component
-      ? vnode.component.subTree
-      : vnode.children
-        ? ((vnode.children as VNodeArrayChildren)[0] as VNode)
-        : undefined
-    : vnode
+  if (!isKeepAlive(vnode)) {
+    return vnode
+  }
+  // #7121 ensure get the child component subtree in case
+  // it's been replaced during HMR
+  if (__DEV__ && vnode.component) {
+    return vnode.component.subTree
+  }
+
+  const { shapeFlag, children } = vnode
+
+  if (children) {
+    if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+      return (children as VNodeArrayChildren)[0] as VNode
+    }
+
+    if (
+      shapeFlag & ShapeFlags.SLOTS_CHILDREN &&
+      isFunction((children as any).default)
+    ) {
+      return (children as any).default()
+    }
+  }
 }
 
 export function setTransitionHooks(vnode: VNode, hooks: TransitionHooks) {

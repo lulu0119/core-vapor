@@ -45,6 +45,7 @@ import { type Directive, validateDirectiveName } from './directives'
 import {
   type ComponentOptions,
   type ComputedOptions,
+  type MergedComponentOptions,
   type MethodOptions,
   applyOptions,
   resolveMergedOptions,
@@ -284,9 +285,13 @@ export interface ComponentInternalInstance {
    */
   effect: ReactiveEffect
   /**
-   * Bound effect runner to be passed to schedulers
+   * Force update render effect
    */
-  update: SchedulerJob
+  update: () => void
+  /**
+   * Render effect job to be passed to scheduler (checks if dirty)
+   */
+  job: SchedulerJob
   /**
    * The render function that returns vdom tree.
    * @internal
@@ -523,6 +528,12 @@ export interface ComponentInternalInstance {
    * @internal
    */
   getCssVars?: () => Record<string, string>
+
+  /**
+   * v2 compat only, for caching mutated $options
+   * @internal
+   */
+  resolvedOptions?: MergedComponentOptions
 }
 
 const emptyAppContext = createAppContext()
@@ -550,6 +561,7 @@ export function createComponentInstance(
     subTree: null!, // will be set synchronously right after creation
     effect: null!,
     update: null!, // will be set synchronously right after creation
+    job: null!,
     scope: new EffectScope(true /* detached */),
     render: null,
     proxy: null,
@@ -774,8 +786,7 @@ function setupStatefulComponent(
   // 0. create render proxy property access cache
   instance.accessCache = Object.create(null)
   // 1. create public instance / render proxy
-  // also mark it raw so it's never observed
-  instance.proxy = markRaw(new Proxy(instance.ctx, PublicInstanceProxyHandlers))
+  instance.proxy = new Proxy(instance.ctx, PublicInstanceProxyHandlers)
   if (__DEV__) {
     exposePropsOnRenderContext(instance)
   }
@@ -1004,36 +1015,28 @@ export function finishComponentSetup(
   }
 }
 
-function getAttrsProxy(instance: ComponentInternalInstance): Data {
-  return (
-    instance.attrsProxy ||
-    (instance.attrsProxy = new Proxy(
-      instance.attrs,
-      __DEV__
-        ? {
-            get(target, key: string) {
-              markAttrsAccessed()
-              track(instance, TrackOpTypes.GET, '$attrs')
-              return target[key]
-            },
-            set() {
-              warn(`setupContext.attrs is readonly.`)
-              return false
-            },
-            deleteProperty() {
-              warn(`setupContext.attrs is readonly.`)
-              return false
-            },
-          }
-        : {
-            get(target, key: string) {
-              track(instance, TrackOpTypes.GET, '$attrs')
-              return target[key]
-            },
-          },
-    ))
-  )
-}
+const attrsProxyHandlers = __DEV__
+  ? {
+      get(target: Data, key: string) {
+        markAttrsAccessed()
+        track(target, TrackOpTypes.GET, '')
+        return target[key]
+      },
+      set() {
+        warn(`setupContext.attrs is readonly.`)
+        return false
+      },
+      deleteProperty() {
+        warn(`setupContext.attrs is readonly.`)
+        return false
+      },
+    }
+  : {
+      get(target: Data, key: string) {
+        track(target, TrackOpTypes.GET, '')
+        return target[key]
+      },
+    }
 
 /**
  * Dev-only
@@ -1080,9 +1083,13 @@ export function createSetupContext(
   if (__DEV__) {
     // We use getters in dev in case libs like test-utils overwrite instance
     // properties (overwrites should not be done in prod)
+    let attrsProxy: Data
     return Object.freeze({
       get attrs() {
-        return getAttrsProxy(instance)
+        return (
+          attrsProxy ||
+          (attrsProxy = new Proxy(instance.attrs, attrsProxyHandlers))
+        )
       },
       get slots() {
         return getSlotsProxy(instance)
@@ -1094,9 +1101,7 @@ export function createSetupContext(
     })
   } else {
     return {
-      get attrs() {
-        return getAttrsProxy(instance)
-      },
+      attrs: new Proxy(instance.attrs, attrsProxyHandlers),
       slots: instance.slots,
       emit: instance.emit,
       expose,

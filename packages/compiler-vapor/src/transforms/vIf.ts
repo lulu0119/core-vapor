@@ -11,12 +11,11 @@ import {
 import {
   type BlockIRNode,
   DynamicFlag,
-  type IRDynamicInfo,
   IRNodeTypes,
   type VaporDirectiveNode,
 } from '../ir'
 import { extend } from '@vue/shared'
-import { genDefaultDynamic, wrapTemplate } from './utils'
+import { newBlock, wrapTemplate } from './utils'
 import { getSiblingIf } from './transformComment'
 
 export const transformVIf = createStructuralDirectiveTransform(
@@ -115,22 +114,8 @@ export function createIfBranch(
 ): [BlockIRNode, () => void] {
   context.node = node = wrapTemplate(node, ['if', 'else-if', 'else'])
 
-  const branch: BlockIRNode = {
-    type: IRNodeTypes.BLOCK,
-    node,
-    dynamic: extend(genDefaultDynamic(), {
-      flags: DynamicFlag.REFERENCED,
-    } satisfies Partial<IRDynamicInfo>),
-    effect: [],
-    operation: [],
-    returns: [],
-  }
-
+  const branch: BlockIRNode = newBlock(node)
   const exitBlock = context.enterBlock(branch)
   context.reference()
-  const onExit = () => {
-    context.registerTemplate()
-    exitBlock()
-  }
-  return [branch, onExit]
+  return [branch, exitBlock]
 }

@@ -1,5 +1,7 @@
 import { reactive, ref } from '@vue/reactivity'
 import {
+  delegate,
+  delegateEvents,
   on,
   setClass,
   setDOMProp,
@@ -14,7 +16,7 @@ import { nextTick } from '@vue/runtime-dom'
 const define = makeRender()
 
 const triggerEvent = (type: string, el: Element) => {
-  const event = new Event(type)
+  const event = new Event(type, { bubbles: true })
   el.dispatchEvent(event)
 }
 
@@ -32,10 +34,11 @@ describe('directive: v-model', () => {
     const data = ref<string | null | undefined>('')
     const { host } = define(() => {
       const t0 = template('<input />')
+      delegateEvents('input')
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
-      on(n0, 'input', () => () => spy(data.value))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'input', () => () => spy(data.value))
       return n0
     }).render()
 
@@ -66,7 +69,7 @@ describe('directive: v-model', () => {
       )
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelSelect, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       on(n0, 'change', () => () => spy(data.value))
       return n0
     }).render()
@@ -93,7 +96,7 @@ describe('directive: v-model', () => {
 
       setDOMProp(n0, 'type', 'number')
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -117,8 +120,8 @@ describe('directive: v-model', () => {
       const t0 = template('<input />')
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
-      on(n0, 'update:modelValue', () => spy)
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => spy)
       return n0
     }).render()
 
@@ -141,7 +144,7 @@ describe('directive: v-model', () => {
       const t0 = template('<input />')
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => (toggle.value ? spy1 : spy2))
+      delegate(n0, 'update:modelValue', () => (toggle.value ? spy1 : spy2))
       return n0
     }).render()
 
@@ -168,7 +171,7 @@ describe('directive: v-model', () => {
       const t0 = template('<textarea />')
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -204,14 +207,14 @@ describe('directive: v-model', () => {
       withDirectives(input1, [
         [vModelDynamic, () => data.number, '', { number: true }],
       ])
-      on(input1, 'update:modelValue', () => val => (data.number = val))
+      delegate(input1, 'update:modelValue', () => val => (data.number = val))
 
       // trim
       setClass(input2, 'trim')
       withDirectives(input2, [
         [vModelDynamic, () => data.trim, '', { trim: true }],
       ])
-      on(input2, 'update:modelValue', () => val => (data.trim = val))
+      delegate(input2, 'update:modelValue', () => val => (data.trim = val))
 
       // trim & number
       setClass(input3, 'trim-number')
@@ -223,14 +226,18 @@ describe('directive: v-model', () => {
           { trim: true, number: true },
         ],
       ])
-      on(input3, 'update:modelValue', () => val => (data.trimNumber = val))
+      delegate(
+        input3,
+        'update:modelValue',
+        () => val => (data.trimNumber = val),
+      )
 
       // lazy
       setClass(input4, 'lazy')
       withDirectives(input4, [
         [vModelDynamic, () => data.lazy, '', { lazy: true }],
       ])
-      on(input4, 'update:modelValue', () => val => (data.lazy = val))
+      delegate(input4, 'update:modelValue', () => val => (data.lazy = val))
 
       return n0
     }).render()
@@ -282,7 +289,7 @@ describe('directive: v-model', () => {
       withDirectives(n1, [
         [vModelDynamic, () => data.value, '', { number: true }],
       ])
-      on(n1, 'update:modelValue', () => val => (data.value = val))
+      delegate(n1, 'update:modelValue', () => val => (data.value = val))
 
       setDOMProps(n2, [
         ['class', 'bar'],
@@ -294,7 +301,7 @@ describe('directive: v-model', () => {
       withDirectives(n2, [
         [vModelDynamic, () => data.value, '', { lazy: true }],
       ])
-      on(n2, 'update:modelValue', () => val => (data.value = val))
+      delegate(n2, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -360,7 +367,7 @@ describe('directive: v-model', () => {
       const n0 = t0() as HTMLInputElement
       setDOMProp(n0, 'type', 'checkbox')
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -396,7 +403,7 @@ describe('directive: v-model', () => {
         ['false-value', 'no'],
       ])
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -434,7 +441,7 @@ describe('directive: v-model', () => {
         ['false-value', { no: 'no' }],
       ])
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -470,7 +477,7 @@ describe('directive: v-model', () => {
         ['value', 'foo'],
       ])
       withDirectives(n1, [[vModelDynamic, () => data.value]])
-      on(n1, 'update:modelValue', () => val => (data.value = val))
+      delegate(n1, 'update:modelValue', () => val => (data.value = val))
 
       setDOMProps(n2, [
         ['class', 'bar'],
@@ -478,7 +485,7 @@ describe('directive: v-model', () => {
         ['value', 'bar'],
       ])
       withDirectives(n2, [[vModelDynamic, () => data.value]])
-      on(n2, 'update:modelValue', () => val => (data.value = val))
+      delegate(n2, 'update:modelValue', () => val => (data.value = val))
 
       return n0
     }).render()
@@ -534,7 +541,7 @@ describe('directive: v-model', () => {
         ['value', 'foo'],
       ])
       withDirectives(n1, [[vModelDynamic, () => data.value]])
-      on(n1, 'update:modelValue', () => val => (data.value = val))
+      delegate(n1, 'update:modelValue', () => val => (data.value = val))
 
       setDOMProps(n2, [
         ['class', 'bar'],
@@ -542,7 +549,7 @@ describe('directive: v-model', () => {
         ['value', 'bar'],
       ])
       withDirectives(n2, [[vModelDynamic, () => data.value]])
-      on(n2, 'update:modelValue', () => val => (data.value = val))
+      delegate(n2, 'update:modelValue', () => val => (data.value = val))
 
       return n0
     }).render()
@@ -598,7 +605,7 @@ describe('directive: v-model', () => {
         ['value', 'foo'],
       ])
       withDirectives(n1, [[vModelDynamic, () => data.value]])
-      on(n1, 'update:modelValue', () => val => (data.value = val))
+      delegate(n1, 'update:modelValue', () => val => (data.value = val))
 
       setDOMProps(n2, [
         ['class', 'bar'],
@@ -606,7 +613,7 @@ describe('directive: v-model', () => {
         ['value', 'bar'],
       ])
       withDirectives(n2, [[vModelDynamic, () => data.value]])
-      on(n2, 'update:modelValue', () => val => (data.value = val))
+      delegate(n2, 'update:modelValue', () => val => (data.value = val))
 
       return n0
     }).render()
@@ -651,7 +658,7 @@ describe('directive: v-model', () => {
 
       setDOMProp(n0, 'value', null)
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -701,7 +708,7 @@ describe('directive: v-model', () => {
         ['multiple', true],
       ])
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -755,7 +762,7 @@ describe('directive: v-model', () => {
       withDirectives(n0, [
         [vModelDynamic, () => data.value, '', { number: true }],
       ])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -785,7 +792,7 @@ describe('directive: v-model', () => {
       withDirectives(n0, [
         [vModelDynamic, () => data.value, '', { number: true }],
       ])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -845,7 +852,7 @@ describe('directive: v-model', () => {
       withDirectives(n0, [
         [vModelDynamic, () => data.value, '', { number: true }],
       ])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -913,7 +920,7 @@ describe('directive: v-model', () => {
         ['multiple', true],
       ])
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -976,7 +983,7 @@ describe('directive: v-model', () => {
       withDirectives(n0, [
         [vModelDynamic, () => data.value, '', { number: true }],
       ])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 
@@ -1026,7 +1033,7 @@ describe('directive: v-model', () => {
       const t0 = template('<input />')
       const n0 = t0() as HTMLInputElement
       withDirectives(n0, [[vModelDynamic, () => data.value]])
-      on(n0, 'update:modelValue', () => val => (data.value = val))
+      delegate(n0, 'update:modelValue', () => val => (data.value = val))
       return n0
     }).render()
 

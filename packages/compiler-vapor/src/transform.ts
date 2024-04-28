@@ -25,7 +25,7 @@ import {
   type VaporDirectiveNode,
 } from './ir'
 import { isConstantExpression } from './utils'
-import { genDefaultDynamic } from './transforms/utils'
+import { newBlock, newDynamic } from './transforms/utils'
 
 export type NodeTransform = (
   node: RootNode | TemplateChildNode,
@@ -43,6 +43,9 @@ export interface DirectiveTransformResult {
   value: SimpleExpressionNode
   modifier?: '.' | '^'
   runtimeCamelize?: boolean
+  handler?: boolean
+  model?: boolean
+  modelModifiers?: string[]
 }
 
 // A structural directive transform is technically also a NodeTransform;
@@ -55,33 +58,122 @@ export type StructuralDirectiveTransform = (
 
 export type TransformOptions = HackOptions<BaseTransformOptions>
 
-export interface TransformContext<T extends AllNode = AllNode> {
-  node: T
-  parent: TransformContext<RootNode | ElementNode> | null
+export class TransformContext<T extends AllNode = AllNode> {
+  parent: TransformContext<RootNode | ElementNode> | null = null
   root: TransformContext<RootNode>
-  index: number
-  block: BlockIRNode
+  index: number = 0
+
+  block: BlockIRNode = this.ir.block
   options: Required<
     Omit<TransformOptions, 'filename' | keyof CompilerCompatOptions>
   >
 
-  template: string
-  childrenTemplate: (string | null)[]
-  dynamic: IRDynamicInfo
+  template: string = ''
+  childrenTemplate: (string | null)[] = []
+  dynamic: IRDynamicInfo = this.ir.block.dynamic
 
-  comment: CommentNode[]
+  inVOnce: boolean = false
+  inVFor: number = 0
 
-  inVOnce: boolean
+  comment: CommentNode[] = []
+  component: Set<string> = this.ir.component
 
-  enterBlock(ir: TransformContext['block']): () => void
-  reference(): number
-  increaseId(): number
-  registerTemplate(): number
+  private globalId = 0
+
+  constructor(
+    private ir: RootIRNode,
+    public node: T,
+    options: TransformOptions = {},
+  ) {
+    this.options = extend({}, defaultOptions, options)
+    this.root = this as TransformContext<RootNode>
+  }
+
+  enterBlock(ir: BlockIRNode, isVFor: boolean = false): () => void {
+    const { block, template, dynamic, childrenTemplate } = this
+    this.block = ir
+    this.dynamic = ir.dynamic
+    this.template = ''
+    this.childrenTemplate = []
+    isVFor && this.inVFor++
+    return () => {
+      // exit
+      this.registerTemplate()
+      this.block = block
+      this.template = template
+      this.dynamic = dynamic
+      this.childrenTemplate = childrenTemplate
+      isVFor && this.inVFor--
+    }
+  }
+
+  increaseId = () => this.globalId++
+  reference() {
+    if (this.dynamic.id !== undefined) return this.dynamic.id
+    this.dynamic.flags |= DynamicFlag.REFERENCED
+    return (this.dynamic.id = this.increaseId())
+  }
+
+  pushTemplate(content: string) {
+    const existing = this.ir.template.findIndex(
+      template => template === content,
+    )
+    if (existing !== -1) return existing
+    this.ir.template.push(content)
+    return this.ir.template.length - 1
+  }
+  registerTemplate() {
+    if (!this.template) return -1
+    const id = this.pushTemplate(this.template)
+    return (this.dynamic.template = id)
+  }
+
   registerEffect(
     expressions: SimpleExpressionNode[],
-    operation: OperationNode[],
-  ): void
-  registerOperation(...operations: OperationNode[]): void
+    ...operations: OperationNode[]
+  ) {
+    expressions = expressions.filter(exp => !isConstantExpression(exp))
+    if (this.inVOnce || expressions.length === 0) {
+      return this.registerOperation(...operations)
+    }
+    const existing = this.block.effect.find(e =>
+      isSameExpression(e.expressions, expressions),
+    )
+    if (existing) {
+      existing.operations.push(...operations)
+    } else {
+      this.block.effect.push({
+        expressions,
+        operations,
+      })
+    }
+
+    function isSameExpression(
+      a: SimpleExpressionNode[],
+      b: SimpleExpressionNode[],
+    ) {
+      if (a.length !== b.length) return false
+      return a.every((exp, i) => exp.content === b[i].content)
+    }
+  }
+  registerOperation(...node: OperationNode[]) {
+    this.block.operation.push(...node)
+  }
+
+  create<T extends TemplateChildNode>(
+    node: T,
+    index: number,
+  ): TransformContext<T> {
+    return Object.assign(Object.create(TransformContext.prototype), this, {
+      node,
+      parent: this as any,
+      index,
+
+      template: '',
+      childrenTemplate: [],
+      dynamic: newDynamic(),
+    } satisfies Partial<TransformContext<T>>)
+  }
 }
 
 const defaultOptions = {
@@ -108,119 +200,21 @@ const defaultOptions = {
   onWarn: defaultOnWarn,
 }
 
-// TODO use class for better perf
-function createRootContext(
-  root: RootIRNode,
-  node: RootNode,
-  options: TransformOptions = {},
-): TransformContext<RootNode> {
-  let globalId = 0
-
-  const context: TransformContext<RootNode> = {
-    node,
-    parent: null,
-    index: 0,
-    root: null!, // set later
-    block: root.block,
-    enterBlock(ir) {
-      const { block, template, dynamic, childrenTemplate } = this
-      this.block = ir
-      this.dynamic = ir.dynamic
-      this.template = ''
-      this.childrenTemplate = []
-      return () => {
-        // exit
-        this.block = block
-        this.template = template
-        this.dynamic = dynamic
-        this.childrenTemplate = childrenTemplate
-      }
-    },
-    options: extend({}, defaultOptions, options),
-    dynamic: root.block.dynamic,
-    inVOnce: false,
-    comment: [],
-
-    increaseId: () => globalId++,
-    reference() {
-      if (this.dynamic.id !== undefined) return this.dynamic.id
-      this.dynamic.flags |= DynamicFlag.REFERENCED
-      return (this.dynamic.id = this.increaseId())
-    },
-    registerEffect(expressions, operations) {
-      expressions = expressions.filter(exp => !isConstantExpression(exp))
-      if (this.inVOnce || expressions.length === 0) {
-        return this.registerOperation(...operations)
-      }
-      const existing = this.block.effect.find(e =>
-        isSameExpression(e.expressions, expressions),
-      )
-      if (existing) {
-        existing.operations.push(...operations)
-      } else {
-        this.block.effect.push({
-          expressions,
-          operations,
-        })
-      }
-
-      function isSameExpression(
-        a: SimpleExpressionNode[],
-        b: SimpleExpressionNode[],
-      ) {
-        if (a.length !== b.length) return false
-        return a.every((exp, i) => exp.content === b[i].content)
-      }
-    },
-
-    template: '',
-    childrenTemplate: [],
-    registerTemplate() {
-      if (!this.template) {
-        return -1
-      }
-
-      const existing = root.template.findIndex(
-        template => template === this.template,
-      )
-      if (existing !== -1) {
-        return (this.dynamic.template = existing)
-      }
-
-      root.template.push(this.template)
-      return (this.dynamic.template = root.template.length - 1)
-    },
-    registerOperation(...node) {
-      this.block.operation.push(...node)
-    },
-  }
-  context.root = context
-  return context
-}
-
 // AST -> IR
 export function transform(
-  root: RootNode,
+  node: RootNode,
   options: TransformOptions = {},
 ): RootIRNode {
   const ir: RootIRNode = {
     type: IRNodeTypes.ROOT,
-    node: root,
-    source: root.source,
+    node,
+    source: node.source,
     template: [],
-    block: {
-      type: IRNodeTypes.BLOCK,
-      node: root,
-      dynamic: extend(genDefaultDynamic(), {
-        flags: DynamicFlag.REFERENCED,
-      } satisfies Partial<IRDynamicInfo>),
-      effect: [],
-      operation: [],
-      returns: [],
-    },
+    component: new Set(),
+    block: newBlock(node),
   }
 
-  const context = createRootContext(ir, root, options)
+  const context = new TransformContext(ir, node, options)
 
   transformNode(context)
 
