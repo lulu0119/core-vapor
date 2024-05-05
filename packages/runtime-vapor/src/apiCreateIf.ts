@@ -10,6 +10,7 @@ export const createIf = (
   condition: () => any,
   b1: BlockFn,
   b2?: BlockFn,
+  effect?: Boolean,
   // hydrationNode?: Node,
 ): Fragment => {
   let newValue: any
@@ -31,8 +32,21 @@ export const createIf = (
   //   setCurrentHydrationNode(hydrationNode!)
   // }
 
-  renderEffect(() => {
-    if ((newValue = !!condition()) !== oldValue) {
+  if (effect) {
+    renderEffect(() => doIf())
+  } else {
+    doIf()
+  }
+
+  // TODO: SSR
+  // if (isHydrating) {
+  //   parent!.insertBefore(anchor, currentHydrationNode)
+  // }
+
+  return fragment
+
+  function doIf() {
+    if ((newValue = !condition()) !== oldValue) {
       parent ||= anchor.parentNode
       if (block) {
         scope!.stop()
@@ -47,12 +61,5 @@ export const createIf = (
         fragment.nodes = []
       }
     }
-  })
-
-  // TODO: SSR
-  // if (isHydrating) {
-  //   parent!.insertBefore(anchor, currentHydrationNode)
-  // }
-
-  return fragment
+  }
 }

@@ -97,7 +97,7 @@ describe('compiler: v-once', () => {
         },
       },
     ])
-    expect(code).not.contains('effect')
+    expect(code).not.contains('renderEffect')
   })
 
   test('on nested plain element', () => {
@@ -146,6 +146,51 @@ describe('compiler: v-once', () => {
   })
 
   test.todo('with hoistStatic: true')
-  test.todo('with v-if/else')
+  test('with v-if/else', () => {
+    const { ir, code, helpers } = compileWithOnce(
+      `<div v-if="BOOLEAN" v-once /><p v-else/>`,
+    )
+    expect(code).toMatchSnapshot()
+    expect(helpers).lengthOf(0)
+    expect(ir.block.effect).lengthOf(0)
+    console.log(JSON.stringify(ir.block.operation, null, 2))
+    expect(ir.block.operation).toMatchObject([
+      {
+        type: IRNodeTypes.IF,
+        id: 0,
+        effect: false,
+        condition: {
+          type: NodeTypes.SIMPLE_EXPRESSION,
+          content: 'BOOLEAN',
+          isStatic: false,
+        },
+        positive: {
+          type: IRNodeTypes.BLOCK,
+          dynamic: {
+            children: [{ template: 0 }],
+          },
+          node: {
+            props: [
+              {
+                type: NodeTypes.DIRECTIVE,
+                exp: {
+                  type: NodeTypes.SIMPLE_EXPRESSION,
+                  content: 'BOOLEAN',
+                  isStatic: false,
+                },
+              },
+            ],
+          },
+        },
+        negative: {
+          type: IRNodeTypes.BLOCK,
+          dynamic: {
+            children: [{ template: 1 }],
+          },
+        },
+      },
+    ])
+    expect(ir.block.returns).toEqual([0])
+  })
   test.todo('with v-for')
 })
