@@ -21,6 +21,7 @@ export const createFor = (
   renderItem: (block: ForBlock) => [Block, () => void],
   getKey?: (item: any, key: any, index?: number) => any,
   getMemo?: (item: any, key: any, index?: number) => any[],
+  once?: boolean,
   hydrationNode?: Node,
 ): Fragment => {
   let isMounted = false
@@ -33,6 +34,7 @@ export const createFor = (
     [fragmentKey]: true,
   }
 
+  //   console.log('createFor', getMemo, once)
   const update = getMemo ? updateWithMemo : updateWithoutMemo
   renderEffect(() => {
     const source = src()

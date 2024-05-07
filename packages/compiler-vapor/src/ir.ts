@@ -80,6 +80,7 @@ export interface ForIRNode extends BaseIRNode {
   index?: SimpleExpressionNode
   keyProp?: SimpleExpressionNode
   render: BlockIRNode
+  once?: boolean
 }
 
 export interface IRProp extends Omit<DirectiveTransformResult, 'value'> {
