@@ -84,6 +84,13 @@ export class TransformContext<T extends AllNode = AllNode> {
   slots?: ComponentSlots
   dynamicSlots?: ComponentDynamicSlot[]
 
+  scopes: {
+    vFor: number
+    vSlot: number
+    vPre: number
+    vOnce: number
+  }
+
   private globalId = 0
 
   constructor(
@@ -93,6 +100,12 @@ export class TransformContext<T extends AllNode = AllNode> {
   ) {
     this.options = extend({}, defaultOptions, options)
     this.root = this as TransformContext<RootNode>
+    this.scopes = {
+      vFor: 0,
+      vSlot: 0,
+      vPre: 0,
+      vOnce: 0,
+    }
   }
 
   enterBlock(ir: BlockIRNode, isVFor: boolean = false): () => void {
@@ -184,6 +197,51 @@ export class TransformContext<T extends AllNode = AllNode> {
       childrenTemplate: [],
       dynamic: newDynamic(),
     } satisfies Partial<TransformContext<T>>)
+  }
+
+  addIdentifiers(exp: SimpleExpressionNode) {
+    if (!__BROWSER__) {
+      if (isString(exp)) {
+        addId(exp)
+      } else if (exp.identifiers) {
+        exp.identifiers.forEach(addId)
+      } else if (exp.type === NodeTypes.SIMPLE_EXPRESSION) {
+        addId(exp.content)
+      }
+    }
+  }
+
+  removeIdentifiers(exp: SimpleExpressionNode) {
+    if (!__BROWSER__) {
+      if (isString(exp)) {
+        removeId(exp)
+      } else if (exp.identifiers) {
+        exp.identifiers.forEach(removeId)
+      } else if (exp.type === NodeTypes.SIMPLE_EXPRESSION) {
+        removeId(exp.content)
+      }
+    }
+  }
+}
+
+let identifiers: { [id: string]: number } = {}
+
+function addId(identifier: string) {
+  if (identifiers.hasOwnProperty(identifier)) {
+    identifiers[identifier]++
+  } else {
+    identifiers[identifier] = 1
+  }
+}
+
+function removeId(identifier: string) {
+  if (identifiers.hasOwnProperty(identifier)) {
+    identifiers[identifier]--
+    if (identifiers[identifier] <= 0) {
+      delete identifiers[identifier] // 如果计数降为0或负数，可以考虑移除这个条目
+    }
+  } else {
+    console.warn(`Attempted to remove untracked identifier: ${identifier}`)
   }
 }
 

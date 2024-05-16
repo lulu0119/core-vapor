@@ -115,3 +115,27 @@ function isNonWhitespaceContent(node: TemplateChildNode): boolean {
   if (node.type !== NodeTypes.TEXT) return true
   return !!node.content.trim()
 }
+
+export const trackSlotScopes: NodeTransform = (node, context) => {
+  if (
+    node.type === NodeTypes.ELEMENT &&
+    (node.tagType === ElementTypes.COMPONENT ||
+      node.tagType === ElementTypes.TEMPLATE)
+  ) {
+    const vSlot = findDir(node, 'slot', true)
+    if (vSlot) {
+      const slotProps = vSlot.exp
+      const { prefixIdentifiers } = context.options
+      if (!__BROWSER__ && prefixIdentifiers) {
+        slotProps && context.addIdentifiers(slotProps)
+      }
+      context.scopes.vSlot++
+      return () => {
+        if (!__BROWSER__ && prefixIdentifiers) {
+          slotProps && context.removeIdentifiers(slotProps)
+        }
+        context.scopes.vSlot--
+      }
+    }
+  }
+}
